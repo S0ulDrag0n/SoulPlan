@@ -36,6 +36,8 @@ export function toSprint(row: SprintRow): Sprint {
     position: row.position,
     capacity: row.capacity,
     capacityUnit: row.capacity_unit,
+    startDate: row.start_date,
+    endDate: row.end_date,
     notes: row.notes,
     createdAt: row.created_at,
   };
@@ -75,6 +77,25 @@ export function taskToRow(task: Partial<Task> & { id: string }): Record<string, 
   if (task.isCritical !== undefined) row.is_critical = task.isCritical ? 1 : 0;
   if (task.sprintId !== undefined) row.sprint_id = task.sprintId;
   if (task.position !== undefined) row.position = task.position;
+  return row;
+}
+
+export function sprintToRow(sprint: Partial<Sprint> & { id: string }): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  if (sprint.name !== undefined) row.name = sprint.name;
+  if (sprint.capacity !== undefined) row.capacity = sprint.capacity;
+  if (sprint.capacityUnit !== undefined) row.capacity_unit = sprint.capacityUnit;
+  if (sprint.startDate !== undefined) row.start_date = sprint.startDate;
+  if (sprint.endDate !== undefined) row.end_date = sprint.endDate;
+  if (sprint.notes !== undefined) row.notes = sprint.notes;
+  return row;
+}
+
+export function releaseToRow(release: Partial<Release> & { id: string }): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  if (release.name !== undefined) row.name = release.name;
+  if (release.targetDate !== undefined) row.target_date = release.targetDate;
+  if (release.notes !== undefined) row.notes = release.notes;
   return row;
 }
 

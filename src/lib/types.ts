@@ -27,6 +27,8 @@ export interface Sprint {
   position: number;
   capacity: number;
   capacityUnit: string;
+  startDate: string | null;
+  endDate: string | null;
   notes: string | null;
   createdAt: string;
 }
@@ -83,8 +85,27 @@ export interface CreateReleaseInput {
   name: string;
 }
 
+/** Input shape for updating a release */
+export interface UpdateReleaseInput {
+  id: string;
+  name?: string;
+  targetDate?: string | null;
+  notes?: string | null;
+}
+
 /** Input shape for creating a sprint */
 export interface CreateSprintInput {
   releaseId: string;
   name: string;
+}
+
+/** Input shape for updating a sprint */
+export interface UpdateSprintInput {
+  id: string;
+  name?: string;
+  capacity?: number;
+  capacityUnit?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  notes?: string | null;
 }

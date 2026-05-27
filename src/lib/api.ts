@@ -1,4 +1,9 @@
-import type { BoardState, CreateTaskInput, UpdateTaskInput, CreateReleaseInput, CreateSprintInput, Task } from '@/lib/types';
+import type {
+  BoardState, CreateTaskInput, UpdateTaskInput,
+  CreateReleaseInput, UpdateReleaseInput,
+  CreateSprintInput, UpdateSprintInput,
+  Task,
+} from '@/lib/types';
 
 const BASE = '/api';
 
@@ -29,12 +34,38 @@ export function createRelease(input: CreateReleaseInput): Promise<unknown> {
   });
 }
 
+export function updateRelease(id: string, input: Omit<UpdateReleaseInput, 'id'>): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/releases/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteRelease(id: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/releases/${id}`, {
+    method: 'DELETE',
+  });
+}
+
 // ─── Sprints ──────────────────────────────────────────────
 
 export function createSprint(input: CreateSprintInput): Promise<unknown> {
   return request('/sprints', {
     method: 'POST',
     body: JSON.stringify(input),
+  });
+}
+
+export function updateSprint(id: string, input: Omit<UpdateSprintInput, 'id'>): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/sprints/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteSprint(id: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/sprints/${id}`, {
+    method: 'DELETE',
   });
 }
 

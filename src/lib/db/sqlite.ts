@@ -38,6 +38,7 @@ async function initialize(): Promise<SqlJsDatabase> {
 
   db.run('PRAGMA foreign_keys = ON');
   migrate(db);
+  migrateV2(db);
   return db;
 }
 
@@ -68,6 +69,8 @@ function migrate(db: SqlJsDatabase): void {
       position INTEGER NOT NULL DEFAULT 0,
       capacity INTEGER DEFAULT 0,
       capacity_unit TEXT DEFAULT 'points',
+      start_date TEXT,
+      end_date TEXT,
       notes TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (release_id) REFERENCES releases(id) ON DELETE CASCADE
@@ -95,6 +98,18 @@ function migrate(db: SqlJsDatabase): void {
       FOREIGN KEY (to_task_id) REFERENCES tasks(id) ON DELETE CASCADE
     );
   `);
+}
+
+function migrateV2(db: SqlJsDatabase): void {
+  // Add start_date and end_date columns to sprints if they don't exist
+  const cols = getAll(db, "PRAGMA table_info(sprints)");
+  const colNames = cols.map((r) => r.name as string);
+  if (!colNames.includes('start_date')) {
+    db.run('ALTER TABLE sprints ADD COLUMN start_date TEXT');
+  }
+  if (!colNames.includes('end_date')) {
+    db.run('ALTER TABLE sprints ADD COLUMN end_date TEXT');
+  }
 }
 
 function saveToDisk(db: SqlJsDatabase): void {
@@ -185,6 +200,22 @@ class SqlJsDataAdapter implements IDatabase {
     saveToDisk(this.db);
   }
 
+  async updateRelease(id: string, fields: Record<string, unknown>): Promise<void> {
+    const allowedKeys = ['name', 'target_date', 'notes'] as const;
+    const sets: string[] = [];
+    const values: SqlValue[] = [];
+    for (const [key, value] of Object.entries(fields)) {
+      if ((allowedKeys as readonly string[]).includes(key)) {
+        sets.push(`${key} = ?`);
+        values.push(value as SqlValue);
+      }
+    }
+    if (sets.length === 0) return;
+    values.push(id);
+    this.db.run(`UPDATE releases SET ${sets.join(', ')} WHERE id = ?`, values);
+    saveToDisk(this.db);
+  }
+
   // ─── Sprints ────────────────────────────────────────────
 
   async getSprintsByReleaseIds(releaseIds: string[]): Promise<SprintRow[]> {
@@ -206,6 +237,22 @@ class SqlJsDataAdapter implements IDatabase {
 
   async deleteSprint(id: string): Promise<void> {
     this.db.run('DELETE FROM sprints WHERE id = ?', [id]);
+    saveToDisk(this.db);
+  }
+
+  async updateSprint(id: string, fields: Record<string, unknown>): Promise<void> {
+    const allowedKeys = ['name', 'capacity', 'capacity_unit', 'start_date', 'end_date', 'notes'] as const;
+    const sets: string[] = [];
+    const values: SqlValue[] = [];
+    for (const [key, value] of Object.entries(fields)) {
+      if ((allowedKeys as readonly string[]).includes(key)) {
+        sets.push(`${key} = ?`);
+        values.push(value as SqlValue);
+      }
+    }
+    if (sets.length === 0) return;
+    values.push(id);
+    this.db.run(`UPDATE sprints SET ${sets.join(', ')} WHERE id = ?`, values);
     saveToDisk(this.db);
   }
 

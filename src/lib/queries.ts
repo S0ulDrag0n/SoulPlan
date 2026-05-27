@@ -3,11 +3,12 @@ import type { IDatabase } from './db/adapter';
 import { getDb } from './db/sqlite';
 import {
   toBoard, toRelease, toSprint, toTask, toDependency,
-  assembleBoardState, taskToRow, nextPosition,
+  assembleBoardState, taskToRow, sprintToRow, releaseToRow, nextPosition,
 } from './transform';
 import type {
   BoardState, CreateTaskInput, UpdateTaskInput,
-  CreateReleaseInput, CreateSprintInput,
+  CreateReleaseInput, UpdateReleaseInput,
+  CreateSprintInput, UpdateSprintInput,
   Task, Release, Sprint, Dependency,
 } from './types';
 
@@ -56,6 +57,17 @@ export async function createRelease(input: CreateReleaseInput): Promise<Release>
   return toRelease(row);
 }
 
+export async function updateRelease(input: UpdateReleaseInput): Promise<void> {
+  const db: IDatabase = await getDb();
+  const fields = releaseToRow(input);
+  await db.updateRelease(input.id, fields);
+}
+
+export async function deleteRelease(id: string): Promise<void> {
+  const db: IDatabase = await getDb();
+  await db.deleteRelease(id);
+}
+
 // ─── Sprint queries ──────────────────────────────────────
 
 export async function createSprint(input: CreateSprintInput): Promise<Sprint> {
@@ -64,6 +76,17 @@ export async function createSprint(input: CreateSprintInput): Promise<Sprint> {
   const position = nextPosition(sprints);
   const row = await db.createSprint(randomUUID(), input.releaseId, input.name, position);
   return toSprint(row);
+}
+
+export async function updateSprint(input: UpdateSprintInput): Promise<void> {
+  const db: IDatabase = await getDb();
+  const fields = sprintToRow(input);
+  await db.updateSprint(input.id, fields);
+}
+
+export async function deleteSprint(id: string): Promise<void> {
+  const db: IDatabase = await getDb();
+  await db.deleteSprint(id);
 }
 
 // ─── Task queries ─────────────────────────────────────────

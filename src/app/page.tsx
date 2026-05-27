@@ -5,10 +5,12 @@ import { DndContext, DragStartEvent, DragOverlay, PointerSensor, useSensor, useS
 import ReleaseBlock from '@/components/ReleaseBlock';
 import TaskCard from '@/components/TaskCard';
 import EditTaskModal from '@/components/EditTaskModal';
+import EditReleaseModal from '@/components/EditReleaseModal';
+import EditSprintModal from '@/components/EditSprintModal';
 import { useBoard } from '@/hooks/useBoard';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
 import { moveTaskBetweenSprints, findTaskById, resolveDropTarget } from '@/lib/transform';
-import type { Task } from '@/lib/types';
+import type { Task, Release, Sprint } from '@/lib/types';
 import * as api from '@/lib/api';
 
 export default function Home() {
@@ -16,6 +18,8 @@ export default function Home() {
   const { saving, moveTask, createTask, saveTask, deleteTask } = useTaskMutations(boardState, reload);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editingRelease, setEditingRelease] = useState<Release | null>(null);
+  const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -68,6 +72,33 @@ export default function Home() {
     await deleteTask(id);
   }, [deleteTask]);
 
+  const handleEditRelease = useCallback(async (id: string, data: { name?: string; targetDate?: string | null; notes?: string | null }) => {
+    await api.updateRelease(id, data);
+    setEditingRelease(null);
+    reload();
+  }, [reload]);
+
+  const handleDeleteRelease = useCallback(async (id: string) => {
+    if (!confirm('Delete this release and all its sprints and tasks?')) return;
+    await api.deleteRelease(id);
+    reload();
+  }, [reload]);
+
+  const handleEditSprint = useCallback(async (id: string, data: {
+    name?: string; capacity?: number; capacityUnit?: string;
+    startDate?: string | null; endDate?: string | null; notes?: string | null;
+  }) => {
+    await api.updateSprint(id, data);
+    setEditingSprint(null);
+    reload();
+  }, [reload]);
+
+  const handleDeleteSprint = useCallback(async (id: string) => {
+    if (!confirm('Delete this sprint and all its tasks?')) return;
+    await api.deleteSprint(id);
+    reload();
+  }, [reload]);
+
   // ─── Render ───────────────────────────────────────────────
 
   if (loading && !boardState) {
@@ -110,9 +141,13 @@ export default function Home() {
                 key={release.id}
                 release={release}
                 onAddSprint={handleAddSprint}
+                onEditRelease={setEditingRelease}
+                onDeleteRelease={handleDeleteRelease}
                 onAddTask={handleAddTask}
                 onEditTask={setEditingTask}
                 onDeleteTask={handleDeleteTask}
+                onEditSprint={setEditingSprint}
+                onDeleteSprint={handleDeleteSprint}
               />
             ))}
           </div>
@@ -122,12 +157,26 @@ export default function Home() {
         </DndContext>
       </main>
 
-      {/* Edit Modal */}
+      {/* Modals */}
       {editingTask && (
         <EditTaskModal
           task={editingTask}
           onSave={handleSaveTask}
           onClose={() => setEditingTask(null)}
+        />
+      )}
+      {editingRelease && (
+        <EditReleaseModal
+          release={editingRelease}
+          onSave={handleEditRelease}
+          onClose={() => setEditingRelease(null)}
+        />
+      )}
+      {editingSprint && (
+        <EditSprintModal
+          sprint={editingSprint}
+          onSave={handleEditSprint}
+          onClose={() => setEditingSprint(null)}
         />
       )}
     </div>

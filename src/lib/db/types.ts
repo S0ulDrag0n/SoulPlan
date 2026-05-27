@@ -26,6 +26,8 @@ export interface SprintRow {
   position: number;
   capacity: number;
   capacity_unit: string;
+  start_date: string | null;
+  end_date: string | null;
   notes: string | null;
   created_at: string;
 }

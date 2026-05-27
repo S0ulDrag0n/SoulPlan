@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     if (!boardId || !name) {
       return NextResponse.json({ error: 'boardId and name required' }, { status: 400 });
     }
-    const release = q.createRelease({ boardId, name });
+    const release = await q.createRelease({ boardId, name });
     return NextResponse.json(release);
   } catch (error) {
     console.error('POST /api/releases error:', error);

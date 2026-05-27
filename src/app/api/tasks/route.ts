@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     if (!body.sprintId || !body.title) {
       return NextResponse.json({ error: 'sprintId and title required' }, { status: 400 });
     }
-    const task = q.createTask(body);
+    const task = await q.createTask(body);
     return NextResponse.json(task);
   } catch (error) {
     console.error('POST /api/tasks error:', error);
@@ -24,7 +24,7 @@ export async function PATCH(req: NextRequest) {
     if (!body.id) {
       return NextResponse.json({ error: 'id required' }, { status: 400 });
     }
-    q.updateTask(body);
+    await q.updateTask(body);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('PATCH /api/tasks error:', error);
@@ -39,7 +39,7 @@ export async function DELETE(req: NextRequest) {
     if (!id) {
       return NextResponse.json({ error: 'id required' }, { status: 400 });
     }
-    q.deleteTask(id);
+    await q.deleteTask(id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('DELETE /api/tasks error:', error);

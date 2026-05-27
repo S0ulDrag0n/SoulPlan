@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import * as q from '@/lib/queries';
 
-export function GET() {
+export async function GET() {
   try {
-    const state = q.getOrCreateDefaultBoard();
+    const state = await q.getOrCreateDefaultBoard();
     return NextResponse.json(state);
   } catch (error) {
     console.error('GET /api/board error:', error);

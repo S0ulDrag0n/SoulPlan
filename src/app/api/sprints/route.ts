@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     if (!releaseId || !name) {
       return NextResponse.json({ error: 'releaseId and name required' }, { status: 400 });
     }
-    const sprint = q.createSprint({ releaseId, name });
+    const sprint = await q.createSprint({ releaseId, name });
     return NextResponse.json(sprint);
   } catch (error) {
     console.error('POST /api/sprints error:', error);

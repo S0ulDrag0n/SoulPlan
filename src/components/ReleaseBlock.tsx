@@ -22,29 +22,27 @@ export default function ReleaseBlock({
   return (
     <div className="flex flex-col border-2 border-gray-300 rounded-2xl bg-gray-100/50 min-w-fit">
       {/* Release header */}
-      <div className="px-4 py-3 bg-gray-800 text-white rounded-t-2xl flex items-center justify-between">
-        <div>
+      <div className="px-4 py-3 bg-gray-800 text-white rounded-t-2xl">
+        <div className="flex items-center gap-2">
           <h2 className="text-lg font-bold">{release.name}</h2>
-          {release.targetDate && (
-            <span className="text-xs text-gray-300">Target: {release.targetDate}</span>
-          )}
-        </div>
-        <div className="flex gap-1">
           <button
             onClick={() => onEditRelease(release)}
-            className="text-gray-300 hover:text-white text-sm px-2 py-1 rounded hover:bg-gray-700"
+            className="text-gray-300 hover:text-white text-sm px-1 rounded hover:bg-gray-700"
             title="Edit release"
           >
             ✏️
           </button>
           <button
             onClick={() => onDeleteRelease(release.id)}
-            className="text-gray-300 hover:text-red-400 text-sm px-2 py-1 rounded hover:bg-gray-700"
+            className="text-gray-300 hover:text-red-400 text-sm px-1 rounded hover:bg-gray-700"
             title="Delete release"
           >
             🗑️
           </button>
         </div>
+        {release.targetDate && (
+          <div className="text-xs text-gray-300 mt-0.5">Target: {release.targetDate}</div>
+        )}
       </div>
 
       {/* Sprints row */}

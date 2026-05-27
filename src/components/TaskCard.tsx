@@ -15,7 +15,7 @@ export default function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
     data: { type: 'task', task },
   });
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.5 : 1,
     borderLeft: `4px solid ${task.color}`,
@@ -35,7 +35,7 @@ export default function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
           {task.estimate > 0 ? `${task.estimate}pt` : '—'}
         </span>
       </div>
-      {!!task.is_critical && (
+      {task.isCritical && (
         <span className="text-xs text-red-600 font-semibold mt-1 inline-block">⚡ Critical</span>
       )}
       <div className="flex gap-1 mt-2">

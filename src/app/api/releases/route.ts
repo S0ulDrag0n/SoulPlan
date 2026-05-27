@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
 import * as q from '@/lib/queries';
 
 export async function POST(req: NextRequest) {
@@ -8,8 +7,7 @@ export async function POST(req: NextRequest) {
     if (!boardId || !name) {
       return NextResponse.json({ error: 'boardId and name required' }, { status: 400 });
     }
-    const row = getDb().prepare('SELECT COALESCE(MAX(position), -1) + 1 as pos FROM releases WHERE board_id = ?').get(boardId) as { pos: number };
-    const release = q.createRelease(boardId, name, row.pos);
+    const release = q.createRelease({ boardId, name });
     return NextResponse.json(release);
   } catch (error) {
     console.error('POST /api/releases error:', error);

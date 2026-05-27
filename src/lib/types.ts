@@ -1,58 +1,90 @@
-// These match the SQLite column names (snake_case)
+/**
+ * Frontend types — camelCase, clean, and UI-friendly.
+ * These are what React components and API responses consume.
+ * Converted from DB row types via pure transform functions in transform.ts.
+ */
 export interface Board {
   id: string;
   name: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Release {
   id: string;
-  board_id: string;
+  boardId: string;
   name: string;
   position: number;
-  target_date?: string;
-  notes?: string;
-  created_at: string;
+  targetDate: string | null;
+  notes: string | null;
+  createdAt: string;
 }
 
 export interface Sprint {
   id: string;
-  release_id: string;
+  releaseId: string;
   name: string;
   position: number;
   capacity: number;
-  capacity_unit: string;
-  notes?: string;
-  created_at: string;
+  capacityUnit: string;
+  notes: string | null;
+  createdAt: string;
 }
 
 export interface Task {
   id: string;
-  sprint_id: string;
+  sprintId: string;
   title: string;
-  description?: string;
+  description: string | null;
   estimate: number;
   color: string;
-  is_critical: number; // SQLite stores 0/1
+  isCritical: boolean;
   position: number;
-  created_at: string;
+  createdAt: string;
 }
 
 export interface Dependency {
   id: string;
-  from_task_id: string;
-  to_task_id: string;
-  created_at: string;
+  fromTaskId: string;
+  toTaskId: string;
+  createdAt: string;
 }
 
-// Board state as seen by the client — fully nested
+/** Nested board state returned by GET /api/board */
 export interface BoardState {
   board: Board;
   releases: (Release & {
-    sprints: (Sprint & {
-      tasks: Task[];
-    })[];
+    sprints: (Sprint & { tasks: Task[] })[];
   })[];
   dependencies: Dependency[];
+}
+
+/** Input shape for creating a task */
+export interface CreateTaskInput {
+  sprintId: string;
+  title: string;
+}
+
+/** Input shape for updating a task — all fields optional except id */
+export interface UpdateTaskInput {
+  id: string;
+  title?: string;
+  description?: string | null;
+  estimate?: number;
+  color?: string;
+  isCritical?: boolean;
+  sprintId?: string;
+  position?: number;
+}
+
+/** Input shape for creating a release */
+export interface CreateReleaseInput {
+  boardId: string;
+  name: string;
+}
+
+/** Input shape for creating a sprint */
+export interface CreateSprintInput {
+  releaseId: string;
+  name: string;
 }

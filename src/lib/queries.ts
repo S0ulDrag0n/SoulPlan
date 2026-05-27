@@ -1,115 +1,100 @@
-import { getDb } from './db';
 import { randomUUID } from 'crypto';
-import type { Board, Release, Sprint, Task, Dependency, BoardState } from './types';
+import type { IDatabase } from './db/adapter';
+import { getDb } from './db/sqlite';
+import {
+  toBoard, toRelease, toSprint, toTask, toDependency,
+  assembleBoardState, taskToRow, nextPosition,
+} from './transform';
+import type {
+  BoardState, CreateTaskInput, UpdateTaskInput,
+  CreateReleaseInput, CreateSprintInput,
+  Task, Release, Sprint, Dependency,
+} from './types';
 
-// ─── Boards ────────────────────────────────────────────────
+// ─── Board queries ────────────────────────────────────────
 
 export function getFullBoardState(boardId: string): BoardState | null {
-  const db = getDb();
-  const board = db.prepare('SELECT * FROM boards WHERE id = ?').get(boardId) as Board | undefined;
+  const db: IDatabase = getDb();
+  const board = db.getBoard(boardId);
   if (!board) return null;
 
-  const releases = db.prepare('SELECT * FROM releases WHERE board_id = ? ORDER BY position')
-    .all(boardId) as Release[];
-
-  const sprints = releases.length > 0
-    ? db.prepare('SELECT * FROM sprints WHERE release_id IN (' + releases.map(() => '?').join(',') + ') ORDER BY position')
-        .all(...releases.map(r => r.id)) as Sprint[]
-    : [];
-
+  const releases = db.getReleasesByBoardId(boardId);
+  const releaseIds = releases.map(r => r.id);
+  const sprints = db.getSprintsByReleaseIds(releaseIds);
   const sprintIds = sprints.map(s => s.id);
-
-  const tasks = sprintIds.length > 0
-    ? db.prepare('SELECT * FROM tasks WHERE sprint_id IN (' + sprintIds.map(() => '?').join(',') + ') ORDER BY position')
-        .all(...sprintIds) as Task[]
-    : [];
-
+  const tasks = db.getTasksBySprintIds(sprintIds);
   const taskIds = tasks.map(t => t.id);
-  const dependencies = taskIds.length > 0
-    ? db.prepare('SELECT * FROM dependencies WHERE from_task_id IN (' + taskIds.map(() => '?').join(',') + ') OR to_task_id IN (' + taskIds.map(() => '?').join(',') + ')')
-        .all(...taskIds, ...taskIds) as Dependency[]
-    : [];
+  const dependencies = db.getDependenciesByTaskIds(taskIds);
 
-  return {
-    board,
-    releases: releases.map(r => ({
-      ...r,
-      sprints: sprints
-        .filter(s => s.release_id === r.id)
-        .map(s => ({
-          ...s,
-          tasks: tasks.filter(t => t.sprint_id === s.id),
-        })),
-    })),
-    dependencies,
-  };
+  return assembleBoardState(board, releases, sprints, tasks, dependencies);
 }
 
-export function createBoard(name: string): Board {
-  const db = getDb();
-  const id = randomUUID();
-  db.prepare('INSERT INTO boards (id, name) VALUES (?, ?)').run(id, name);
-  return db.prepare('SELECT * FROM boards WHERE id = ?').get(id) as Board;
-}
+export function getOrCreateDefaultBoard(): BoardState {
+  const db: IDatabase = getDb();
+  const boards = db.getAllBoards();
 
-// ─── Releases ───────────────────────────────────────────────
-
-export function createRelease(boardId: string, name: string, position: number): Release {
-  const db = getDb();
-  const id = randomUUID();
-  db.prepare('INSERT INTO releases (id, board_id, name, position) VALUES (?, ?, ?, ?)').run(id, boardId, name, position);
-  return db.prepare('SELECT * FROM releases WHERE id = ?').get(id) as Release;
-}
-
-// ─── Sprints ────────────────────────────────────────────────
-
-export function createSprint(releaseId: string, name: string, position: number): Sprint {
-  const db = getDb();
-  const id = randomUUID();
-  db.prepare('INSERT INTO sprints (id, release_id, name, position) VALUES (?, ?, ?, ?)').run(id, releaseId, name, position);
-  return db.prepare('SELECT * FROM sprints WHERE id = ?').get(id) as Sprint;
-}
-
-// ─── Tasks ──────────────────────────────────────────────────
-
-export function createTask(sprintId: string, title: string, position: number): Task {
-  const db = getDb();
-  const id = randomUUID();
-  db.prepare('INSERT INTO tasks (id, sprint_id, title, position) VALUES (?, ?, ?, ?)').run(id, sprintId, title, position);
-  return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Task;
-}
-
-export function updateTask(id: string, data: Record<string, unknown>) {
-  const db = getDb();
-  const allowedKeys = ['title', 'description', 'estimate', 'color', 'is_critical', 'sprint_id', 'position'];
-  const sets: string[] = [];
-  const values: unknown[] = [];
-  for (const [key, value] of Object.entries(data)) {
-    if (allowedKeys.includes(key)) {
-      sets.push(`${key} = ?`);
-      values.push(value);
-    }
+  let boardId: string;
+  if (boards.length === 0) {
+    const board = db.createBoard(randomUUID(), 'SoulPlan Board');
+    boardId = board.id;
+  } else {
+    boardId = boards[0].id;
   }
-  if (sets.length === 0) return;
-  values.push(id);
-  db.prepare(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+
+  const state = getFullBoardState(boardId);
+  if (!state) throw new Error('Failed to load board state');
+  return state;
 }
 
-export function deleteTask(id: string) {
-  const db = getDb();
-  db.prepare('DELETE FROM dependencies WHERE from_task_id = ? OR to_task_id = ?').run(id, id);
-  db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
+// ─── Release queries ─────────────────────────────────────
+
+export function createRelease(input: CreateReleaseInput): Release {
+  const db: IDatabase = getDb();
+  const releases = db.getReleasesByBoardId(input.boardId);
+  const position = nextPosition(releases);
+  const row = db.createRelease(randomUUID(), input.boardId, input.name, position);
+  return toRelease(row);
 }
 
-// ─── Dependencies ──────────────────────────────────────────
+// ─── Sprint queries ──────────────────────────────────────
+
+export function createSprint(input: CreateSprintInput): Sprint {
+  const db: IDatabase = getDb();
+  const sprints = db.getSprintsByReleaseIds([input.releaseId]);
+  const position = nextPosition(sprints);
+  const row = db.createSprint(randomUUID(), input.releaseId, input.name, position);
+  return toSprint(row);
+}
+
+// ─── Task queries ─────────────────────────────────────────
+
+export function createTask(input: CreateTaskInput): Task {
+  const db: IDatabase = getDb();
+  const position = db.getMaxTaskPosition(input.sprintId);
+  const row = db.createTask(randomUUID(), input.sprintId, input.title, position);
+  return toTask(row);
+}
+
+export function updateTask(input: UpdateTaskInput): void {
+  const db: IDatabase = getDb();
+  const fields = taskToRow(input);
+  db.updateTask(input.id, fields);
+}
+
+export function deleteTask(id: string): void {
+  const db: IDatabase = getDb();
+  db.deleteTask(id);
+}
+
+// ─── Dependency queries ──────────────────────────────────
 
 export function createDependency(fromTaskId: string, toTaskId: string): Dependency {
-  const db = getDb();
-  const id = randomUUID();
-  db.prepare('INSERT INTO dependencies (id, from_task_id, to_task_id) VALUES (?, ?, ?)').run(id, fromTaskId, toTaskId);
-  return db.prepare('SELECT * FROM dependencies WHERE id = ?').get(id) as Dependency;
+  const db: IDatabase = getDb();
+  const row = db.createDependency(randomUUID(), fromTaskId, toTaskId);
+  return toDependency(row);
 }
 
-export function deleteDependency(id: string) {
-  getDb().prepare('DELETE FROM dependencies WHERE id = ?').run(id);
+export function deleteDependency(id: string): void {
+  const db: IDatabase = getDb();
+  db.deleteDependency(id);
 }

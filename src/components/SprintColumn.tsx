@@ -45,7 +45,7 @@ export default function SprintColumn({ sprint, tasks, onAddTask, onEditTask, onD
       {/* Footer: capacity + notes */}
       <div className="px-3 py-2 border-t border-gray-200 bg-gray-100 rounded-b-xl">
         <div className="text-xs text-gray-500">
-          Capacity: <span className="font-semibold">{sprint.capacity}{sprint.capacity_unit}</span>
+          Capacity: <span className="font-semibold">{sprint.capacity}{sprint.capacityUnit}</span>
         </div>
         {sprint.notes && (
           <div className="text-xs text-gray-400 mt-1 italic truncate">{sprint.notes}</div>

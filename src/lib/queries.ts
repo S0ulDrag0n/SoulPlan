@@ -13,88 +13,88 @@ import type {
 
 // ─── Board queries ────────────────────────────────────────
 
-export function getFullBoardState(boardId: string): BoardState | null {
-  const db: IDatabase = getDb();
-  const board = db.getBoard(boardId);
+export async function getFullBoardState(boardId: string): Promise<BoardState | null> {
+  const db: IDatabase = await getDb();
+  const board = await db.getBoard(boardId);
   if (!board) return null;
 
-  const releases = db.getReleasesByBoardId(boardId);
+  const releases = await db.getReleasesByBoardId(boardId);
   const releaseIds = releases.map(r => r.id);
-  const sprints = db.getSprintsByReleaseIds(releaseIds);
+  const sprints = await db.getSprintsByReleaseIds(releaseIds);
   const sprintIds = sprints.map(s => s.id);
-  const tasks = db.getTasksBySprintIds(sprintIds);
+  const tasks = await db.getTasksBySprintIds(sprintIds);
   const taskIds = tasks.map(t => t.id);
-  const dependencies = db.getDependenciesByTaskIds(taskIds);
+  const dependencies = await db.getDependenciesByTaskIds(taskIds);
 
   return assembleBoardState(board, releases, sprints, tasks, dependencies);
 }
 
-export function getOrCreateDefaultBoard(): BoardState {
-  const db: IDatabase = getDb();
-  const boards = db.getAllBoards();
+export async function getOrCreateDefaultBoard(): Promise<BoardState> {
+  const db: IDatabase = await getDb();
+  const boards = await db.getAllBoards();
 
   let boardId: string;
   if (boards.length === 0) {
-    const board = db.createBoard(randomUUID(), 'SoulPlan Board');
+    const board = await db.createBoard(randomUUID(), 'SoulPlan Board');
     boardId = board.id;
   } else {
     boardId = boards[0].id;
   }
 
-  const state = getFullBoardState(boardId);
+  const state = await getFullBoardState(boardId);
   if (!state) throw new Error('Failed to load board state');
   return state;
 }
 
 // ─── Release queries ─────────────────────────────────────
 
-export function createRelease(input: CreateReleaseInput): Release {
-  const db: IDatabase = getDb();
-  const releases = db.getReleasesByBoardId(input.boardId);
+export async function createRelease(input: CreateReleaseInput): Promise<Release> {
+  const db: IDatabase = await getDb();
+  const releases = await db.getReleasesByBoardId(input.boardId);
   const position = nextPosition(releases);
-  const row = db.createRelease(randomUUID(), input.boardId, input.name, position);
+  const row = await db.createRelease(randomUUID(), input.boardId, input.name, position);
   return toRelease(row);
 }
 
 // ─── Sprint queries ──────────────────────────────────────
 
-export function createSprint(input: CreateSprintInput): Sprint {
-  const db: IDatabase = getDb();
-  const sprints = db.getSprintsByReleaseIds([input.releaseId]);
+export async function createSprint(input: CreateSprintInput): Promise<Sprint> {
+  const db: IDatabase = await getDb();
+  const sprints = await db.getSprintsByReleaseIds([input.releaseId]);
   const position = nextPosition(sprints);
-  const row = db.createSprint(randomUUID(), input.releaseId, input.name, position);
+  const row = await db.createSprint(randomUUID(), input.releaseId, input.name, position);
   return toSprint(row);
 }
 
 // ─── Task queries ─────────────────────────────────────────
 
-export function createTask(input: CreateTaskInput): Task {
-  const db: IDatabase = getDb();
-  const position = db.getMaxTaskPosition(input.sprintId);
-  const row = db.createTask(randomUUID(), input.sprintId, input.title, position);
+export async function createTask(input: CreateTaskInput): Promise<Task> {
+  const db: IDatabase = await getDb();
+  const position = await db.getMaxTaskPosition(input.sprintId);
+  const row = await db.createTask(randomUUID(), input.sprintId, input.title, position);
   return toTask(row);
 }
 
-export function updateTask(input: UpdateTaskInput): void {
-  const db: IDatabase = getDb();
+export async function updateTask(input: UpdateTaskInput): Promise<void> {
+  const db: IDatabase = await getDb();
   const fields = taskToRow(input);
-  db.updateTask(input.id, fields);
+  await db.updateTask(input.id, fields);
 }
 
-export function deleteTask(id: string): void {
-  const db: IDatabase = getDb();
-  db.deleteTask(id);
+export async function deleteTask(id: string): Promise<void> {
+  const db: IDatabase = await getDb();
+  await db.deleteTask(id);
 }
 
 // ─── Dependency queries ──────────────────────────────────
 
-export function createDependency(fromTaskId: string, toTaskId: string): Dependency {
-  const db: IDatabase = getDb();
-  const row = db.createDependency(randomUUID(), fromTaskId, toTaskId);
+export async function createDependency(fromTaskId: string, toTaskId: string): Promise<Dependency> {
+  const db: IDatabase = await getDb();
+  const row = await db.createDependency(randomUUID(), fromTaskId, toTaskId);
   return toDependency(row);
 }
 
-export function deleteDependency(id: string): void {
-  const db: IDatabase = getDb();
-  db.deleteDependency(id);
+export async function deleteDependency(id: string): Promise<void> {
+  const db: IDatabase = await getDb();
+  await db.deleteDependency(id);
 }

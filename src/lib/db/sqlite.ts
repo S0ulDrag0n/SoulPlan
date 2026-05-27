@@ -1,225 +1,286 @@
-import Database from 'better-sqlite3';
-import path from 'path';
+import initSqlJs, { type Database as SqlJsDatabase, type SqlValue } from 'sql.js';
+import * as path from 'path';
+import * as fs from 'fs';
 import type { IDatabase } from './adapter';
 import type {
   BoardRow, ReleaseRow, SprintRow, TaskRow, DependencyRow,
 } from './types';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'soul-plan.db');
+const DATA_DIR = path.join(process.cwd(), 'data');
+const DB_PATH = path.join(DATA_DIR, 'soul-plan.db');
 
-let instance: SQLiteDatabase | null = null;
+let instance: SqlJsDatabase | null = null;
+let initPromise: Promise<SqlJsDatabase> | null = null;
 
-export function getDb(): SQLiteDatabase {
-  if (!instance) {
-    instance = new SQLiteDatabase(DB_PATH);
+export async function getDb(): Promise<IDatabase> {
+  if (instance) return new SqlJsDataAdapter(instance);
+  if (!initPromise) {
+    initPromise = initialize();
   }
-  return instance;
+  instance = await initPromise;
+  return new SqlJsDataAdapter(instance);
 }
 
-export function closeDb(): void {
-  if (instance) {
-    instance.close();
-    instance = null;
+async function initialize(): Promise<SqlJsDatabase> {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
   }
+
+  const SQL = await initSqlJs();
+
+  let db: SqlJsDatabase;
+  if (fs.existsSync(DB_PATH)) {
+    const buffer = fs.readFileSync(DB_PATH);
+    db = new SQL.Database(buffer);
+  } else {
+    db = new SQL.Database();
+  }
+
+  db.run('PRAGMA foreign_keys = ON');
+  migrate(db);
+  return db;
 }
 
-/**
- * SQLite database adapter.
- * Uses prepared statements cached for the lifetime of the connection.
- */
-export class SQLiteDatabase implements IDatabase {
-  private db: Database.Database;
+function migrate(db: SqlJsDatabase): void {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS boards (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
 
-  // Prepared statements (cached on first use)
-  private stmts: Map<string, Database.Statement> = new Map();
+    CREATE TABLE IF NOT EXISTS releases (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      target_date TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE
+    );
 
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath);
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('foreign_keys = ON');
-    this.migrate();
-  }
+    CREATE TABLE IF NOT EXISTS sprints (
+      id TEXT PRIMARY KEY,
+      release_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      capacity INTEGER DEFAULT 0,
+      capacity_unit TEXT DEFAULT 'points',
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (release_id) REFERENCES releases(id) ON DELETE CASCADE
+    );
 
-  private prepare(sql: string): Database.Statement {
-    let stmt = this.stmts.get(sql);
-    if (!stmt) {
-      stmt = this.db.prepare(sql);
-      this.stmts.set(sql, stmt);
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY,
+      sprint_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      estimate INTEGER DEFAULT 0,
+      color TEXT DEFAULT '#3b82f6',
+      is_critical INTEGER DEFAULT 0,
+      position INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (sprint_id) REFERENCES sprints(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS dependencies (
+      id TEXT PRIMARY KEY,
+      from_task_id TEXT NOT NULL,
+      to_task_id TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (from_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+      FOREIGN KEY (to_task_id) REFERENCES tasks(id) ON DELETE CASCADE
+    );
+  `);
+}
+
+function saveToDisk(db: SqlJsDatabase): void {
+  const data = db.export();
+  const buffer = Buffer.from(data);
+  fs.writeFileSync(DB_PATH, buffer);
+}
+
+type Row = Record<string, SqlValue>;
+
+function getOne(db: SqlJsDatabase, sql: string, params: SqlValue[] = []): Row | undefined {
+  const stmt = db.prepare(sql);
+  stmt.bind(params);
+  try {
+    if (stmt.step()) {
+      return stmt.getAsObject();
     }
-    return stmt;
+    return undefined;
+  } finally {
+    stmt.free();
   }
+}
 
-  private migrate() {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS boards (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
-      );
-
-      CREATE TABLE IF NOT EXISTS releases (
-        id TEXT PRIMARY KEY,
-        board_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        position INTEGER NOT NULL DEFAULT 0,
-        target_date TEXT,
-        notes TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS sprints (
-        id TEXT PRIMARY KEY,
-        release_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        position INTEGER NOT NULL DEFAULT 0,
-        capacity INTEGER DEFAULT 0,
-        capacity_unit TEXT DEFAULT 'points',
-        notes TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (release_id) REFERENCES releases(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS tasks (
-        id TEXT PRIMARY KEY,
-        sprint_id TEXT NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT,
-        estimate INTEGER DEFAULT 0,
-        color TEXT DEFAULT '#3b82f6',
-        is_critical INTEGER DEFAULT 0,
-        position INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (sprint_id) REFERENCES sprints(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS dependencies (
-        id TEXT PRIMARY KEY,
-        from_task_id TEXT NOT NULL,
-        to_task_id TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (from_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-        FOREIGN KEY (to_task_id) REFERENCES tasks(id) ON DELETE CASCADE
-      );
-    `);
+function getAll(db: SqlJsDatabase, sql: string, params: SqlValue[] = []): Row[] {
+  const stmt = db.prepare(sql);
+  stmt.bind(params);
+  const results: Row[] = [];
+  try {
+    while (stmt.step()) {
+      results.push(stmt.getAsObject());
+    }
+    return results;
+  } finally {
+    stmt.free();
   }
+}
 
-  close() {
-    this.db.close();
+class SqlJsDataAdapter implements IDatabase {
+  constructor(private db: SqlJsDatabase) {}
+
+  close(): void {
+    if (instance) {
+      saveToDisk(instance);
+      instance.close();
+      instance = null;
+      initPromise = null;
+    }
   }
 
   // ─── Boards ──────────────────────────────────────────────
 
-  getBoard(id: string): BoardRow | undefined {
-    return this.prepare('SELECT * FROM boards WHERE id = ?').get(id) as BoardRow | undefined;
+  async getBoard(id: string): Promise<BoardRow | undefined> {
+    const row = getOne(this.db, 'SELECT * FROM boards WHERE id = ?', [id]);
+    return row as unknown as BoardRow | undefined;
   }
 
-  getAllBoards(): BoardRow[] {
-    return this.prepare('SELECT * FROM boards').all() as BoardRow[];
+  async getAllBoards(): Promise<BoardRow[]> {
+    return getAll(this.db, 'SELECT * FROM boards') as unknown as BoardRow[];
   }
 
-  createBoard(id: string, name: string): BoardRow {
-    this.prepare('INSERT INTO boards (id, name) VALUES (?, ?)').run(id, name);
-    return this.prepare('SELECT * FROM boards WHERE id = ?').get(id) as BoardRow;
+  async createBoard(id: string, name: string): Promise<BoardRow> {
+    this.db.run('INSERT INTO boards (id, name) VALUES (?, ?)', [id, name]);
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM boards WHERE id = ?', [id]);
+    return row as unknown as BoardRow;
   }
 
-  updateBoardUpdatedAt(id: string): void {
-    this.prepare("UPDATE boards SET updated_at = datetime('now') WHERE id = ?").run(id);
+  async updateBoardUpdatedAt(id: string): Promise<void> {
+    this.db.run("UPDATE boards SET updated_at = datetime('now') WHERE id = ?", [id]);
+    saveToDisk(this.db);
   }
 
   // ─── Releases ─────────────────────────────────────────────
 
-  getReleasesByBoardId(boardId: string): ReleaseRow[] {
-    return this.prepare('SELECT * FROM releases WHERE board_id = ? ORDER BY position').all(boardId) as ReleaseRow[];
+  async getReleasesByBoardId(boardId: string): Promise<ReleaseRow[]> {
+    return getAll(this.db, 'SELECT * FROM releases WHERE board_id = ? ORDER BY position', [boardId]) as unknown as ReleaseRow[];
   }
 
-  createRelease(id: string, boardId: string, name: string, position: number): ReleaseRow {
-    this.prepare('INSERT INTO releases (id, board_id, name, position) VALUES (?, ?, ?, ?)').run(id, boardId, name, position);
-    return this.prepare('SELECT * FROM releases WHERE id = ?').get(id) as ReleaseRow;
+  async createRelease(id: string, boardId: string, name: string, position: number): Promise<ReleaseRow> {
+    this.db.run('INSERT INTO releases (id, board_id, name, position) VALUES (?, ?, ?, ?)', [id, boardId, name, position]);
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM releases WHERE id = ?', [id]);
+    return row as unknown as ReleaseRow;
   }
 
-  deleteRelease(id: string): void {
-    this.prepare('DELETE FROM releases WHERE id = ?').run(id);
+  async deleteRelease(id: string): Promise<void> {
+    this.db.run('DELETE FROM releases WHERE id = ?', [id]);
+    saveToDisk(this.db);
   }
 
   // ─── Sprints ────────────────────────────────────────────
 
-  getSprintsByReleaseIds(releaseIds: string[]): SprintRow[] {
+  async getSprintsByReleaseIds(releaseIds: string[]): Promise<SprintRow[]> {
     if (releaseIds.length === 0) return [];
     const placeholders = releaseIds.map(() => '?').join(',');
-    return this.prepare(`SELECT * FROM sprints WHERE release_id IN (${placeholders}) ORDER BY position`)
-      .all(...releaseIds) as SprintRow[];
+    return getAll(
+      this.db,
+      `SELECT * FROM sprints WHERE release_id IN (${placeholders}) ORDER BY position`,
+      releaseIds,
+    ) as unknown as SprintRow[];
   }
 
-  createSprint(id: string, releaseId: string, name: string, position: number): SprintRow {
-    this.prepare('INSERT INTO sprints (id, release_id, name, position) VALUES (?, ?, ?, ?)').run(id, releaseId, name, position);
-    return this.prepare('SELECT * FROM sprints WHERE id = ?').get(id) as SprintRow;
+  async createSprint(id: string, releaseId: string, name: string, position: number): Promise<SprintRow> {
+    this.db.run('INSERT INTO sprints (id, release_id, name, position) VALUES (?, ?, ?, ?)', [id, releaseId, name, position]);
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM sprints WHERE id = ?', [id]);
+    return row as unknown as SprintRow;
   }
 
-  deleteSprint(id: string): void {
-    this.prepare('DELETE FROM sprints WHERE id = ?').run(id);
+  async deleteSprint(id: string): Promise<void> {
+    this.db.run('DELETE FROM sprints WHERE id = ?', [id]);
+    saveToDisk(this.db);
   }
 
   // ─── Tasks ───────────────────────────────────────────────
 
-  getTasksBySprintIds(sprintIds: string[]): TaskRow[] {
+  async getTasksBySprintIds(sprintIds: string[]): Promise<TaskRow[]> {
     if (sprintIds.length === 0) return [];
     const placeholders = sprintIds.map(() => '?').join(',');
-    return this.prepare(`SELECT * FROM tasks WHERE sprint_id IN (${placeholders}) ORDER BY position`)
-      .all(...sprintIds) as TaskRow[];
+    return getAll(
+      this.db,
+      `SELECT * FROM tasks WHERE sprint_id IN (${placeholders}) ORDER BY position`,
+      sprintIds,
+    ) as unknown as TaskRow[];
   }
 
-  createTask(id: string, sprintId: string, title: string, position: number): TaskRow {
-    this.prepare('INSERT INTO tasks (id, sprint_id, title, position) VALUES (?, ?, ?, ?)').run(id, sprintId, title, position);
-    return this.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as TaskRow;
+  async createTask(id: string, sprintId: string, title: string, position: number): Promise<TaskRow> {
+    this.db.run('INSERT INTO tasks (id, sprint_id, title, position) VALUES (?, ?, ?, ?)', [id, sprintId, title, position]);
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM tasks WHERE id = ?', [id]);
+    return row as unknown as TaskRow;
   }
 
-  updateTask(id: string, fields: Record<string, unknown>): void {
-    const allowedKeys = ['title', 'description', 'estimate', 'color', 'is_critical', 'sprint_id', 'position'];
+  async updateTask(id: string, fields: Record<string, unknown>): Promise<void> {
+    const allowedKeys = ['title', 'description', 'estimate', 'color', 'is_critical', 'sprint_id', 'position'] as const;
     const sets: string[] = [];
-    const values: unknown[] = [];
+    const values: SqlValue[] = [];
     for (const [key, value] of Object.entries(fields)) {
-      if (allowedKeys.includes(key)) {
+      if ((allowedKeys as readonly string[]).includes(key)) {
         sets.push(`${key} = ?`);
-        values.push(value);
+        values.push(value as SqlValue);
       }
     }
     if (sets.length === 0) return;
     values.push(id);
-    this.prepare(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+    this.db.run(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`, values);
+    saveToDisk(this.db);
   }
 
-  deleteTask(id: string): void {
-    this.prepare('DELETE FROM dependencies WHERE from_task_id = ? OR to_task_id = ?').run(id, id);
-    this.prepare('DELETE FROM tasks WHERE id = ?').run(id);
+  async deleteTask(id: string): Promise<void> {
+    this.db.run('DELETE FROM dependencies WHERE from_task_id = ? OR to_task_id = ?', [id, id]);
+    this.db.run('DELETE FROM tasks WHERE id = ?', [id]);
+    saveToDisk(this.db);
   }
 
-  getMaxTaskPosition(sprintId: string): number {
-    const row = this.prepare('SELECT COALESCE(MAX(position), -1) + 1 as pos FROM tasks WHERE sprint_id = ?').get(sprintId) as { pos: number };
-    return row.pos;
+  async getMaxTaskPosition(sprintId: string): Promise<number> {
+    const row = getOne(this.db, 'SELECT COALESCE(MAX(position), -1) + 1 as pos FROM tasks WHERE sprint_id = ?', [sprintId]);
+    return (row?.pos as number) ?? 0;
   }
 
   // ─── Dependencies ──────────────────────────────────────
 
-  getDependenciesByTaskIds(taskIds: string[]): DependencyRow[] {
+  async getDependenciesByTaskIds(taskIds: string[]): Promise<DependencyRow[]> {
     if (taskIds.length === 0) return [];
     const placeholders = taskIds.map(() => '?').join(',');
-    return this.prepare(
-      `SELECT * FROM dependencies WHERE from_task_id IN (${placeholders}) OR to_task_id IN (${placeholders})`
-    ).all(...taskIds, ...taskIds) as DependencyRow[];
+    return getAll(
+      this.db,
+      `SELECT * FROM dependencies WHERE from_task_id IN (${placeholders}) OR to_task_id IN (${placeholders})`,
+      [...taskIds, ...taskIds],
+    ) as unknown as DependencyRow[];
   }
 
-  createDependency(id: string, fromTaskId: string, toTaskId: string): DependencyRow {
-    this.prepare('INSERT INTO dependencies (id, from_task_id, to_task_id) VALUES (?, ?, ?)').run(id, fromTaskId, toTaskId);
-    return this.prepare('SELECT * FROM dependencies WHERE id = ?').get(id) as DependencyRow;
+  async createDependency(id: string, fromTaskId: string, toTaskId: string): Promise<DependencyRow> {
+    this.db.run('INSERT INTO dependencies (id, from_task_id, to_task_id) VALUES (?, ?, ?)', [id, fromTaskId, toTaskId]);
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM dependencies WHERE id = ?', [id]);
+    return row as unknown as DependencyRow;
   }
 
-  deleteDependency(id: string): void {
-    this.prepare('DELETE FROM dependencies WHERE id = ?').run(id);
+  async deleteDependency(id: string): Promise<void> {
+    this.db.run('DELETE FROM dependencies WHERE id = ?', [id]);
+    saveToDisk(this.db);
   }
 
-  deleteDependenciesByTaskId(taskId: string): void {
-    this.prepare('DELETE FROM dependencies WHERE from_task_id = ? OR to_task_id = ?').run(taskId, taskId);
+  async deleteDependenciesByTaskId(taskId: string): Promise<void> {
+    this.db.run('DELETE FROM dependencies WHERE from_task_id = ? OR to_task_id = ?', [taskId, taskId]);
+    saveToDisk(this.db);
   }
 }

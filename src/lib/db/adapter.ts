@@ -4,36 +4,41 @@ import type {
 
 /**
  * Database adapter interface.
- * Swappable implementation — SQLite for local/dev, Postgres for production.
+ * Swappable implementation — sql.js for universal compat, Postgres for production.
  * All methods return raw DB rows (snake_case). Transform to camelCase in the service layer.
+ *
+ * Since sql.js (WASM) requires async initialization, all methods are async.
  */
 export interface IDatabase {
+  // ─── Lifecycle ─────────────────────────────────────────
+  close(): void;
+
   // ─── Boards ──────────────────────────────────────────────
-  getBoard(id: string): BoardRow | undefined;
-  getAllBoards(): BoardRow[];
-  createBoard(id: string, name: string): BoardRow;
-  updateBoardUpdatedAt(id: string): void;
+  getBoard(id: string): Promise<BoardRow | undefined>;
+  getAllBoards(): Promise<BoardRow[]>;
+  createBoard(id: string, name: string): Promise<BoardRow>;
+  updateBoardUpdatedAt(id: string): Promise<void>;
 
   // ─── Releases ─────────────────────────────────────────────
-  getReleasesByBoardId(boardId: string): ReleaseRow[];
-  createRelease(id: string, boardId: string, name: string, position: number): ReleaseRow;
-  deleteRelease(id: string): void;
+  getReleasesByBoardId(boardId: string): Promise<ReleaseRow[]>;
+  createRelease(id: string, boardId: string, name: string, position: number): Promise<ReleaseRow>;
+  deleteRelease(id: string): Promise<void>;
 
   // ─── Sprints ────────────────────────────────────────────
-  getSprintsByReleaseIds(releaseIds: string[]): SprintRow[];
-  createSprint(id: string, releaseId: string, name: string, position: number): SprintRow;
-  deleteSprint(id: string): void;
+  getSprintsByReleaseIds(releaseIds: string[]): Promise<SprintRow[]>;
+  createSprint(id: string, releaseId: string, name: string, position: number): Promise<SprintRow>;
+  deleteSprint(id: string): Promise<void>;
 
   // ─── Tasks ───────────────────────────────────────────────
-  getTasksBySprintIds(sprintIds: string[]): TaskRow[];
-  createTask(id: string, sprintId: string, title: string, position: number): TaskRow;
-  updateTask(id: string, fields: Record<string, unknown>): void;
-  deleteTask(id: string): void;
-  getMaxTaskPosition(sprintId: string): number;
+  getTasksBySprintIds(sprintIds: string[]): Promise<TaskRow[]>;
+  createTask(id: string, sprintId: string, title: string, position: number): Promise<TaskRow>;
+  updateTask(id: string, fields: Record<string, unknown>): Promise<void>;
+  deleteTask(id: string): Promise<void>;
+  getMaxTaskPosition(sprintId: string): Promise<number>;
 
   // ─── Dependencies ──────────────────────────────────────
-  getDependenciesByTaskIds(taskIds: string[]): DependencyRow[];
-  createDependency(id: string, fromTaskId: string, toTaskId: string): DependencyRow;
-  deleteDependency(id: string): void;
-  deleteDependenciesByTaskId(taskId: string): void;
+  getDependenciesByTaskIds(taskIds: string[]): Promise<DependencyRow[]>;
+  createDependency(id: string, fromTaskId: string, toTaskId: string): Promise<DependencyRow>;
+  deleteDependency(id: string): Promise<void>;
+  deleteDependenciesByTaskId(taskId: string): Promise<void>;
 }

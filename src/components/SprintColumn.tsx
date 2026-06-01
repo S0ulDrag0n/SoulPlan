@@ -24,6 +24,7 @@ export default function SprintColumn({
   });
 
   const dateRange = [sprint.startDate, sprint.endDate].filter(Boolean).join(' → ');
+  const usedCapacity = tasks.reduce((sum, t) => sum + (t.estimate || 0), 0);
 
   return (
     <div
@@ -33,27 +34,33 @@ export default function SprintColumn({
       }`}
     >
       {/* Sprint header */}
-      <div className="px-3 py-2 border-b border-gray-200 bg-white rounded-t-xl flex items-center justify-between">
-        <div className="min-w-0">
+      <div className="px-3 py-2 border-b border-gray-200 bg-white rounded-t-xl">
+        <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-bold text-gray-700 truncate">{sprint.name}</h3>
-          {dateRange && (
-            <div className="text-xs text-gray-400">{dateRange}</div>
-          )}
+          <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded shrink-0">
+            {usedCapacity}/{sprint.capacity}{sprint.capacityUnit}
+          </span>
         </div>
-        <div className="flex gap-1 shrink-0">
+        {(dateRange || sprint.notes) && (
+          <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
+            {dateRange && <span>{dateRange}</span>}
+            {sprint.notes && (
+              <span className="italic truncate">{sprint.notes}</span>
+            )}
+          </div>
+        )}
+        <div className="flex gap-2 mt-1">
           <button
             onClick={() => onEditSprint(sprint)}
-            className="text-gray-400 hover:text-gray-600 text-xs px-1 rounded hover:bg-gray-100"
-            title="Edit sprint"
+            className="text-xs text-gray-400 hover:text-blue-500 transition-colors"
           >
-            ✏️
+            Edit
           </button>
           <button
             onClick={() => onDeleteSprint(sprint.id)}
-            className="text-gray-400 hover:text-red-500 text-xs px-1 rounded hover:bg-gray-100"
-            title="Delete sprint"
+            className="text-xs text-gray-400 hover:text-red-500 transition-colors"
           >
-            🗑️
+            Delete
           </button>
         </div>
       </div>
@@ -70,17 +77,11 @@ export default function SprintColumn({
         ))}
       </div>
 
-      {/* Footer: capacity + notes */}
+      {/* Footer: add task */}
       <div className="px-3 py-2 border-t border-gray-200 bg-gray-100 rounded-b-xl">
-        <div className="text-xs text-gray-500">
-          Capacity: <span className="font-semibold">{sprint.capacity}{sprint.capacityUnit}</span>
-        </div>
-        {sprint.notes && (
-          <div className="text-xs text-gray-400 mt-1 italic truncate">{sprint.notes}</div>
-        )}
         <button
           onClick={() => onAddTask(sprint.id)}
-          className="mt-2 text-xs text-blue-500 hover:text-blue-700 font-medium"
+          className="text-xs text-blue-500 hover:text-blue-700 font-medium"
         >
           + Add Task
         </button>

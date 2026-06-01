@@ -1,4 +1,4 @@
-# SoulPlan Progress — commit c4d672f (master)
+# SoulPlan Progress — commit 7f79641 (master)
 
 ## Completed
 
@@ -23,28 +23,26 @@
 ### Bug Fix
 - All async `q.*` query calls in route handlers were missing `await` — fixed
 
+### Task Reorder Within Sprint
+- Package: `@dnd-kit/sortable` added for sortable drag-and-drop
+- `SortableTaskCard` component: wraps task card with `useSortable` hook, handles transform/transition/drag styles
+- `SprintColumn`: wraps tasks in `SortableContext` with `verticalListSortingStrategy`
+- `page.tsx`: `DndContext` with `PointerSensor` (5px distance activation), `handleDragStart` sets overlay task, `handleDragEnd` dispatches reorder vs cross-sprint move
+- `useTaskMutations`: added `reorderTasks()` — sends parallel `PATCH /tasks` with updated `position` for each moved task
+- Drag overlay: lightweight `DragOverlayTask` rendered while dragging (no sortable hooks)
+
+### Task Dependencies (Badge UI + CRUD)
+- **API route**: `POST/DELETE /api/dependencies` — create (with self-ref validation) and delete dependencies
+- **API client**: `createDependency(fromTaskId, toTaskId)`, `deleteDependency(id)`
+- **TaskCard badges**: orange "← blocked" chips for incoming deps, blue "→ blocks" chips for outgoing deps
+- **Badge click**: `onJumpToTask` opens the dependent task's edit modal
+- **EditTaskModal dependency section**:
+  - Shows "Blocked by" (orange) and "Blocks" (blue) chips with × remove buttons
+  - Two dropdown selectors: "Blocks →" (blue) and "← Blocked by" (orange)
+  - Real-time add/remove with board refresh after each mutation
+  - Task titles shown in chips; dropdown shows all other tasks across the board
+
 ## Remaining Work
-
-### Feature 1: Task Dependencies (SVG lines between tasks)
-**Already exists in backend:**
-- `dependencies` DB table with `from_task_id`/`to_task_id` + CASCADE
-- `createDependency`/`deleteDependency` in queries.ts
-- `toDependency` in transform.ts
-- Dependencies included in `assembleBoardState`
-
-**Still needed:**
-- API routes: `POST/DELETE /api/dependencies/route.ts`
-- API client: `createDependency(fromTaskId, toTaskId)`, `deleteDependency(id)`
-- UI: SVG overlay component for dependency lines
-- UI: Click-to-link interaction (select source task, then target task)
-- UI: Delete dependency action (click line or button)
-- Board state needs `dependencies` exposed if not already
-
-### Feature: Task Reorder Within Sprint
-- Backend fully supports it: `position` column on tasks, `UpdateTaskInput` accepts `position`, `taskToRow()` maps it
-- Need: Re-add `@dnd-kit/sortable` package (was removed as unused)
-- Need: `SortableContext` wrapper in `SprintColumn`, `useSortable` in `TaskCard`
-- Need: Handler to PATCH updated positions after reorder
 
 ### Feature: Zoom & Pan (Canvas Navigation)
 Scrolling horizontally/vertically across many sprints and releases is cumbersome. Need Photoshop/Miro-style canvas navigation:
@@ -53,10 +51,16 @@ Scrolling horizontally/vertically across many sprints and releases is cumbersome
 - **Zoom controls**: fit-to-screen, zoom to selection, +/- buttons
 - **Minimap** (optional): bird's-eye overview with viewport indicator
 - Implementation: wrap the board in a zoomable/pannable container (e.g. `react-zoom-pan-pinch` or custom transform layer using CSS `transform: scale() translate()`)
-- `@dnd-kit` drag events need coordinate transform adjustment when zoomed
+- `@dnd-kit` v6+ handles zoomed containers natively via `measuring={{ draggable: { frequency: 1 } }}` — only prop change needed, no architecture shift
+
+### Future: SVG Dependency Lines
+- If badge UX proves insufficient, add SVG overlay lines between dependent tasks
+- Estimated 6-10h for cross-sprint routing, hit testing, coordinate math
+- Badge approach gives 80% value with 20% effort — SVG lines are a later polish
 
 ## Architecture Notes
 - sql.js in-memory DB, persisted to `data/soul-plan.db` via `saveToDisk()`
 - `getDb()` is module-scoped async singleton — may reset on Turbopack hot reload (known dev-mode issue)
-- Frontend hooks: `useBoard()` (fetch + reload), `useTaskMutations()` (optimistic moves, CRUD)
+- Frontend hooks: `useBoard()` (fetch + reload), `useTaskMutations()` (optimistic moves, CRUD, reorder)
 - All DB mutations call `saveToDisk()` after write
+- DnD: `DndContext` wraps board, `SortableContext` per sprint column, `useSortable` per task card

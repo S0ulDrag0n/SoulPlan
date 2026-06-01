@@ -46,6 +46,15 @@
 - Need: `SortableContext` wrapper in `SprintColumn`, `useSortable` in `TaskCard`
 - Need: Handler to PATCH updated positions after reorder
 
+### Feature: Zoom & Pan (Canvas Navigation)
+Scrolling horizontally/vertically across many sprints and releases is cumbersome. Need Photoshop/Miro-style canvas navigation:
+- **Hold Space + drag** to pan (hand tool)
+- **Scroll wheel** / **pinch** to zoom in/out
+- **Zoom controls**: fit-to-screen, zoom to selection, +/- buttons
+- **Minimap** (optional): bird's-eye overview with viewport indicator
+- Implementation: wrap the board in a zoomable/pannable container (e.g. `react-zoom-pan-pinch` or custom transform layer using CSS `transform: scale() translate()`)
+- `@dnd-kit` drag events need coordinate transform adjustment when zoomed
+
 ## Architecture Notes
 - sql.js in-memory DB, persisted to `data/soul-plan.db` via `saveToDisk()`
 - `getDb()` is module-scoped async singleton — may reset on Turbopack hot reload (known dev-mode issue)

@@ -2,7 +2,7 @@ import type {
   BoardState, CreateTaskInput, UpdateTaskInput,
   CreateReleaseInput, UpdateReleaseInput,
   CreateSprintInput, UpdateSprintInput,
-  Task,
+  Task, Dependency,
 } from '@/lib/types';
 
 const BASE = '/api';
@@ -87,6 +87,22 @@ export function updateTask(input: UpdateTaskInput): Promise<{ success: boolean }
 
 export function deleteTask(id: string): Promise<{ success: boolean }> {
   return request<{ success: boolean }>('/tasks', {
+    method: 'DELETE',
+    body: JSON.stringify({ id }),
+  });
+}
+
+// ─── Dependencies ──────────────────────────────────────────
+
+export function createDependency(fromTaskId: string, toTaskId: string): Promise<Dependency> {
+  return request<Dependency>('/dependencies', {
+    method: 'POST',
+    body: JSON.stringify({ fromTaskId, toTaskId }),
+  });
+}
+
+export function deleteDependency(id: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>('/dependencies', {
     method: 'DELETE',
     body: JSON.stringify({ id }),
   });

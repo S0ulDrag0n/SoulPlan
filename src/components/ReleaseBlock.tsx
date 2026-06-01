@@ -1,6 +1,6 @@
 'use client';
 
-import type { Release, Sprint, Task } from '@/lib/types';
+import type { Dependency, Release, Sprint, Task } from '@/lib/types';
 import SprintColumn from './SprintColumn';
 
 interface ReleaseBlockProps {
@@ -8,16 +8,19 @@ interface ReleaseBlockProps {
   onAddSprint: (releaseId: string) => void;
   onEditRelease: (release: Release) => void;
   onDeleteRelease: (id: string) => void;
-  onAddTask: (sprintId: string) => void;
+  onAddTask: (sprintId: string) > void;
   onEditTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onEditSprint: (sprint: Sprint) => void;
   onDeleteSprint: (id: string) => void;
+  dependencies: Dependency[];
+  onJumpToTask?: (taskId: string) => void;
 }
 
 export default function ReleaseBlock({
   release, onAddSprint, onEditRelease, onDeleteRelease,
   onAddTask, onEditTask, onDeleteTask, onEditSprint, onDeleteSprint,
+  dependencies, onJumpToTask,
 }: ReleaseBlockProps) {
   return (
     <div className="flex flex-col border-2 border-gray-300 rounded-2xl bg-gray-100/50 min-w-fit">
@@ -52,11 +55,13 @@ export default function ReleaseBlock({
             key={sprint.id}
             sprint={sprint}
             tasks={sprint.tasks}
+            dependencies={dependencies}
             onAddTask={onAddTask}
             onEditTask={onEditTask}
             onDeleteTask={onDeleteTask}
             onEditSprint={onEditSprint}
             onDeleteSprint={onDeleteSprint}
+            onJumpToTask={onJumpToTask}
           />
         ))}
         <button

@@ -1,0 +1,36 @@
+import { NextRequest, NextResponse } from 'next/server';
+import * as q from '@/lib/queries';
+
+// POST /api/dependencies — create a dependency (fromTaskId → toTaskId meaning "from blocks to")
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { fromTaskId, toTaskId } = body;
+    if (!fromTaskId || !toTaskId) {
+      return NextResponse.json({ error: 'fromTaskId and toTaskId required' }, { status: 400 });
+    }
+    if (fromTaskId === toTaskId) {
+      return NextResponse.json({ error: 'Cannot create self-referencing dependency' }, { status: 400 });
+    }
+    const dep = await q.createDependency(fromTaskId, toTaskId);
+    return NextResponse.json(dep);
+  } catch (error) {
+    console.error('POST /api/dependencies error:', error);
+    return NextResponse.json({ error: 'Failed to create dependency' }, { status: 500 });
+  }
+}
+
+// DELETE /api/dependencies — delete a dependency by id
+export async function DELETE(req: NextRequest) {
+  try {
+    const { id } = await req.json();
+    if (!id) {
+      return NextResponse.json({ error: 'id required' }, { status: 400 });
+    }
+    await q.deleteDependency(id);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('DELETE /api/dependencies error:', error);
+    return NextResponse.json({ error: 'Failed to delete dependency' }, { status: 500 });
+  }
+}

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { DndContext, DragStartEvent, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 import ReleaseBlock from '@/components/ReleaseBlock';
-import TaskCard from '@/components/TaskCard';
 import EditTaskModal from '@/components/EditTaskModal';
 import EditReleaseModal from '@/components/EditReleaseModal';
 import EditSprintModal from '@/components/EditSprintModal';
@@ -15,7 +16,7 @@ import * as api from '@/lib/api';
 
 export default function Home() {
   const { boardState, loading, error, reload } = useBoard();
-  const { saving, moveTask, createTask, saveTask, deleteTask } = useTaskMutations(boardState, reload);
+  const { saving, moveTask, createTask, saveTask, deleteTask, reorderTasks } = useTaskMutations(boardState, reload);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingRelease, setEditingRelease] = useState<Release | null>(null);
@@ -33,17 +34,64 @@ export default function Home() {
     setActiveTask(task ?? null);
   }, [boardState]);
 
-  const handleDragEnd = useCallback(async (event: DragStartEvent & { over: { id: string | number } | null }) => {
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     setActiveTask(null);
     const { active, over } = event;
     if (!over || !boardState) return;
 
     const taskId = String(active.id);
+
+    // Find which sprint the over target belongs to
     const targetSprintId = resolveDropTarget(boardState, over.id);
     if (!targetSprintId) return;
 
+    const activeSprintId = findTaskById(boardState, taskId)?.sprintId;
+
+    if (activeSprintId === targetSprintId) {
+      // Same sprint — reorder
+      const sprint = boardState.releases
+        .flatMap(r => r.sprints)
+        .find(s => s.id === targetSprintId);
+      if (!sprint) return;
+
+      const oldIndex = sprint.tasks.findIndex(t => t.id === taskId);
+      if (oldIndex === -1) return;
+
+      const overId = String(over.id);
+      const newIndex = sprint.tasks.findIndex(t => t.id === overId);
+
+      if (newIndex === -1) {
+        // Dropped on the sprint column itself — move to end
+        const positionUpdates = sprint.tasks
+          .filter(t => t.id !== taskId)
+          .map((t, i) => ({ id: t.id, position: i }));
+        positionUpdates.push({ id: taskId, position: sprint.tasks.length - 1 });
+        await reorderTasks(positionUpdates);
+        return;
+      }
+
+      if (oldIndex === newIndex) return;
+
+      const reordered = arrayMove(sprint.tasks, oldIndex, newIndex);
+      const positionUpdates = reordered.map((t, i) => ({
+        id: t.id,
+        position: i,
+      }));
+      await reorderTasks(positionUpdates);
+      return;
+    }
+
+    // Move between sprints
     await moveTask(taskId, targetSprintId);
-  }, [boardState, moveTask]);
+  }, [boardState, moveTask, reorderTasks]);
+
+  // ─── Jump to task (for dependency badges) ────────────────
+
+  const handleJumpToTask = useCallback((taskId: string) => {
+    if (!boardState) return;
+    const task = findTaskById(boardState, taskId);
+    if (task) setEditingTask(task);
+  }, [boardState]);
 
   // ─── CRUD handlers ────────────────────────────────────────
 
@@ -116,6 +164,8 @@ export default function Home() {
 
   if (!boardState) return null;
 
+  const allDependencies = boardState.dependencies;
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -148,11 +198,13 @@ export default function Home() {
                 onDeleteTask={handleDeleteTask}
                 onEditSprint={setEditingSprint}
                 onDeleteSprint={handleDeleteSprint}
+                dependencies={allDependencies}
+                onJumpToTask={handleJumpToTask}
               />
             ))}
           </div>
           <DragOverlay>
-            {activeTask ? <TaskCard task={activeTask} onEdit={() => {}} onDelete={() => {}} /> : null}
+            {activeTask ? <DragOverlayTask task={activeTask} /> : null}
           </DragOverlay>
         </DndContext>
       </main>
@@ -161,6 +213,7 @@ export default function Home() {
       {editingTask && (
         <EditTaskModal
           task={editingTask}
+          boardState={boardState}
           onSave={handleSaveTask}
           onClose={() => setEditingTask(null)}
         />
@@ -179,6 +232,23 @@ export default function Home() {
           onClose={() => setEditingSprint(null)}
         />
       )}
+    </div>
+  );
+}
+
+/** Lightweight task card for the drag overlay (no sortable hooks) */
+function DragOverlayTask({ task }: { task: Task }) {
+  return (
+    <div
+      className="bg-white rounded-lg shadow-lg p-3 border-l-4"
+      style={{ borderLeftColor: task.color }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-gray-800">{task.title}</span>
+        <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+          {task.estimate > 0 ? `${task.estimate}pt` : '—'}
+        </span>
+      </div>
     </div>
   );
 }

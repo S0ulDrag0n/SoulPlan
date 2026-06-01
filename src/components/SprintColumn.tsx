@@ -1,22 +1,25 @@
 'use client';
 
 import { useDroppable } from '@dnd-kit/core';
-import TaskCard from './TaskCard';
-import type { Sprint, Task } from '@/lib/types';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import SortableTaskCard from './SortableTaskCard';
+import type { Dependency, Sprint, Task } from '@/lib/types';
 
 interface SprintColumnProps {
   sprint: Sprint;
   tasks: Task[];
+  dependencies: Dependency[];
   onAddTask: (sprintId: string) => void;
   onEditTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onEditSprint: (sprint: Sprint) => void;
   onDeleteSprint: (id: string) => void;
+  onJumpToTask?: (taskId: string) => void;
 }
 
 export default function SprintColumn({
-  sprint, tasks, onAddTask, onEditTask, onDeleteTask,
-  onEditSprint, onDeleteSprint,
+  sprint, tasks, dependencies, onAddTask, onEditTask, onDeleteTask,
+  onEditSprint, onDeleteSprint, onJumpToTask,
 }: SprintColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: sprint.id,
@@ -25,6 +28,8 @@ export default function SprintColumn({
 
   const dateRange = [sprint.startDate, sprint.endDate].filter(Boolean).join(' → ');
   const usedCapacity = tasks.reduce((sum, t) => sum + (t.estimate || 0), 0);
+
+  const taskIds = tasks.map(t => t.id);
 
   return (
     <div
@@ -65,16 +70,25 @@ export default function SprintColumn({
         </div>
       </div>
 
-      {/* Tasks */}
-      <div className="flex-1 px-3 py-2 space-y-2 min-h-[120px]">
-        {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onEdit={onEditTask}
-            onDelete={onDeleteTask}
-          />
-        ))}
+      {/* Sortable tasks */}
+      <div className="flex-1 px-3 py-2 min-h-[120px]">
+        <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+          {tasks.map((task) => {
+            const blockingDeps = dependencies.filter(d => d.fromTaskId === task.id);
+            const blockedByDeps = dependencies.filter(d => d.toTaskId === task.id);
+            return (
+              <SortableTaskCard
+                key={task.id}
+                task={task}
+                blockingDeps={blockingDeps}
+                blockedByDeps={blockedByDeps}
+                onEdit={onEditTask}
+                onDelete={onDeleteTask}
+                onJumpToTask={onJumpToTask}
+              />
+            );
+          })}
+        </SortableContext>
       </div>
 
       {/* Footer: add task */}

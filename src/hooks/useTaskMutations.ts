@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import type { Task, UpdateTaskInput } from '@/lib/types';
+import type { Task, UpdateTaskInput, BoardState } from '@/lib/types';
 import { moveTaskBetweenSprints, resolveDropTarget, findSprintIdForTask } from '@/lib/transform';
-import type { BoardState } from '@/lib/types';
 import * as api from '@/lib/api';
 
 export function useTaskMutations(
@@ -33,6 +32,23 @@ export function useTaskMutations(
     }
 
     return optimisticState;
+  };
+
+  /** Reorder tasks within a sprint by sending position updates */
+  const reorderTasks = async (positionUpdates: { id: string; position: number }[]) => {
+    if (!boardState) return;
+    try {
+      setSaving(true);
+      // Send all position updates in parallel
+      await Promise.all(
+        positionUpdates.map(u => api.updateTask({ id: u.id, position: u.position }))
+      );
+      onBoardUpdate();
+    } catch {
+      onBoardUpdate();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const createTask = async (sprintId: string, title: string) => {
@@ -84,5 +100,5 @@ export function useTaskMutations(
     return resolveDropTarget(boardState, overId);
   };
 
-  return { saving, moveTask, createTask, saveTask, deleteTask, resolveDrop };
+  return { saving, moveTask, reorderTasks, createTask, saveTask, deleteTask, resolveDrop };
 }

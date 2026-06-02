@@ -22,12 +22,10 @@ export function useTaskMutations(
     if (!boardState) return;
 
     const sourceSprintId = findSprintIdForTask(boardState, taskId);
-    console.log('[moveTask] taskId:', taskId, 'sourceSprintId:', sourceSprintId, 'targetSprintId:', targetSprintId, 'insertIndex:', insertIndex);
     if (!sourceSprintId) return;
 
     // Optimistic update — apply immediately so UI doesn't rubber-band
     const optimisticState = moveTaskBetweenSprints(boardState, taskId, targetSprintId, insertIndex);
-    console.log('[moveTask] optimisticState valid:', !!optimisticState, 'releases:', optimisticState.releases.length);
     setBoardState(optimisticState);
 
     // Build position updates for all affected tasks

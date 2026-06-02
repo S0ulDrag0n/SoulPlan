@@ -131,26 +131,62 @@ export function assembleBoardState(
 
 // ─── Optimistic update logic (pure function) ──────────────────
 
+/**
+ * Move a task from its current sprint to a target sprint,
+ * inserting it at a specific index within the target sprint's task list.
+ * If insertIndex is omitted or -1, appends to the end.
+ */
 export function moveTaskBetweenSprints(
   state: BoardState,
   taskId: string,
-  targetSprintId: string
+  targetSprintId: string,
+  insertIndex: number = -1
 ): BoardState {
+  const task = findTaskById(state, taskId);
+  if (!task) return state;
+
+  // Already in target sprint — just reorder within
+  if (task.sprintId === targetSprintId) {
+    const sprint = findSprintById(state, targetSprintId);
+    if (!sprint) return state;
+    const withoutTask = sprint.tasks.filter(t => t.id !== taskId);
+    const idx = insertIndex === -1 || insertIndex > withoutTask.length
+      ? withoutTask.length
+      : insertIndex;
+    const reordered = [...withoutTask];
+    reordered.splice(idx, 0, { ...task, position: idx });
+    // Reindex positions
+    const reindexed = reordered.map((t, i) => ({ ...t, position: i }));
+    return patchSprint(state, targetSprintId, reindexed);
+  }
+
+  // Move between sprints
+  const targetSprint = findSprintById(state, targetSprintId);
+  if (!targetSprint) return state;
+
+  const movedTask = { ...task, sprintId: targetSprintId };
+  const idx = insertIndex === -1 || insertIndex > targetSprint.tasks.length
+    ? targetSprint.tasks.length
+    : insertIndex;
+
+  // Insert into target at position, remove from source
+  const newTargetTasks = [...targetSprint.tasks];
+  newTargetTasks.splice(idx, 0, movedTask);
+  // Reindex all positions
+  const reindexedTarget = newTargetTasks.map((t, i) => ({ ...t, position: i }));
+
   return {
     ...state,
     releases: state.releases.map(release => ({
       ...release,
       sprints: release.sprints.map(sprint => {
-        // Add task to target sprint
         if (sprint.id === targetSprintId) {
-          const task = findTaskById(state, taskId);
-          if (!task) return sprint;
-          // Avoid duplicate if source === target
-          if (task.sprintId === targetSprintId) return sprint;
-          return { ...sprint, tasks: [...sprint.tasks, { ...task, sprintId: targetSprintId }] };
+          return { ...sprint, tasks: reindexedTarget };
         }
-        // Remove task from source sprint
-        return { ...sprint, tasks: sprint.tasks.filter(t => t.id !== taskId) };
+        // Remove from source sprint and reindex
+        const filtered = sprint.tasks.filter(t => t.id !== taskId);
+        const reindexed = filtered.map((t, i) => ({ ...t, position: i }));
+        return { ...sprint, tasks: reindexed };
       }),
     })),
     dependencies: state.dependencies,
@@ -167,6 +203,15 @@ export function findTaskById(state: BoardState, taskId: string): Task | undefine
   return undefined;
 }
 
+export function findSprintById(state: BoardState, sprintId: string): Sprint | undefined {
+  for (const release of state.releases) {
+    for (const sprint of release.sprints) {
+      if (sprint.id === sprintId) return sprint;
+    }
+  }
+  return undefined;
+}
+
 export function findSprintIdForTask(state: BoardState, taskId: string): string | undefined {
   for (const release of state.releases) {
     for (const sprint of release.sprints) {
@@ -178,19 +223,43 @@ export function findSprintIdForTask(state: BoardState, taskId: string): string |
   return undefined;
 }
 
+/**
+ * Resolve a drop target to { sprintId, insertIndex }.
+ * - Dropping on a task → insert before that task in its sprint
+ * - Dropping on a sprint column → append to end
+ */
 export function resolveDropTarget(
   state: BoardState,
   overId: string | number
-): string | undefined {
+): { sprintId: string; insertIndex: number } | undefined {
   const id = String(overId);
-  // Check if dropped on a sprint directly
   for (const release of state.releases) {
     for (const sprint of release.sprints) {
-      if (sprint.id === id) return id;
-      if (sprint.tasks.some(t => t.id === id)) return sprint.id;
+      if (sprint.id === id) {
+        // Dropped on sprint column → append to end
+        return { sprintId: id, insertIndex: sprint.tasks.length };
+      }
+      const taskIndex = sprint.tasks.findIndex(t => t.id === id);
+      if (taskIndex !== -1) {
+        // Dropped on a task → insert before it
+        return { sprintId: sprint.id, insertIndex: taskIndex };
+      }
     }
   }
   return undefined;
+}
+
+/** Patch just one sprint's tasks, reindexing positions. */
+function patchSprint(state: BoardState, sprintId: string, tasks: Task[]): BoardState {
+  return {
+    ...state,
+    releases: state.releases.map(r => ({
+      ...r,
+      sprints: r.sprints.map(s =>
+        s.id === sprintId ? { ...s, tasks } : s
+      ),
+    })),
+  };
 }
 
 // ─── Position calculation (pure function) ─────────────────────

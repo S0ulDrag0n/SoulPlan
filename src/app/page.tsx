@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
@@ -22,6 +22,10 @@ export default function Home() {
   const [editingRelease, setEditingRelease] = useState<Release | null>(null);
   const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
 
+  // Ref to always-read-latest boardState in async DnD handlers
+  const boardStateRef = useRef(boardState);
+  boardStateRef.current = boardState;
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
@@ -29,28 +33,30 @@ export default function Home() {
   // ─── DnD handlers ─────────────────────────────────────────
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    if (!boardState) return;
-    const task = findTaskById(boardState, String(event.active.id));
+    const state = boardStateRef.current;
+    if (!state) return;
+    const task = findTaskById(state, String(event.active.id));
     setActiveTask(task ?? null);
-  }, [boardState]);
+  }, []);
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     setActiveTask(null);
     const { active, over } = event;
-    if (!over || !boardState) return;
+    const state = boardStateRef.current;
+    if (!over || !state) return;
 
     const taskId = String(active.id);
 
     // resolveDropTarget returns { sprintId, insertIndex }
-    const drop = resolveDropTarget(boardState, over.id);
+    const drop = resolveDropTarget(state, over.id);
     if (!drop) return;
 
     const { sprintId: targetSprintId, insertIndex } = drop;
-    const activeSprintId = findTaskById(boardState, taskId)?.sprintId;
+    const activeSprintId = findTaskById(state, taskId)?.sprintId;
 
     if (activeSprintId === targetSprintId) {
       // Same sprint — reorder within
-      const sprint = boardState.releases
+      const sprint = state.releases
         .flatMap(r => r.sprints)
         .find(s => s.id === targetSprintId);
       if (!sprint) return;
@@ -62,7 +68,9 @@ export default function Home() {
       if (oldIndex === insertIndex || (insertIndex === sprint.tasks.length && oldIndex === sprint.tasks.length - 1)) return;
 
       // Use arrayMove for same-sprint reorder
-      const reordered = arrayMove(sprint.tasks, oldIndex, insertIndex > oldIndex ? insertIndex : insertIndex);
+      // When dragging item at oldIndex onto item at insertIndex,
+      // arrayMove moves oldIndex → insertIndex (in original array coords)
+      const reordered = arrayMove(sprint.tasks, oldIndex, insertIndex);
       const positionUpdates = reordered.map((t, i) => ({
         id: t.id,
         position: i,
@@ -73,29 +81,32 @@ export default function Home() {
 
     // Cross-sprint move — pass insertIndex so task lands at the right position
     await moveTask(taskId, targetSprintId, insertIndex);
-  }, [boardState, moveTask, reorderTasks]);
+  }, [moveTask, reorderTasks]);
 
   // ─── Jump to task (for dependency badges) ────────────────
 
   const handleJumpToTask = useCallback((taskId: string) => {
-    if (!boardState) return;
-    const task = findTaskById(boardState, taskId);
+    const state = boardStateRef.current;
+    if (!state) return;
+    const task = findTaskById(state, taskId);
     if (task) setEditingTask(task);
-  }, [boardState]);
+  }, []);
 
   // ─── CRUD handlers ────────────────────────────────────────
 
   const handleAddRelease = useCallback(async () => {
-    if (!boardState) return;
-    await api.createRelease({ boardId: boardState.board.id, name: `Release ${boardState.releases.length + 1}` });
+    const state = boardStateRef.current;
+    if (!state) return;
+    await api.createRelease({ boardId: state.board.id, name: `Release ${state.releases.length + 1}` });
     reload();
-  }, [boardState, reload]);
+  }, [reload]);
 
   const handleAddSprint = useCallback(async (releaseId: string) => {
-    const release = boardState?.releases.find(r => r.id === releaseId);
+    const state = boardStateRef.current;
+    const release = state?.releases.find(r => r.id === releaseId);
     await api.createSprint({ releaseId, name: `Sprint ${(release?.sprints.length ?? 0) + 1}` });
     reload();
-  }, [boardState, reload]);
+  }, [reload]);
 
   const handleAddTask = useCallback(async (sprintId: string) => {
     await createTask(sprintId, 'New Task');

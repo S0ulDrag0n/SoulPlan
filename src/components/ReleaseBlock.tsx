@@ -1,17 +1,17 @@
 'use client';
 
-import type { Dependency, Release, Sprint, Task } from '@/lib/types';
 import SprintColumn from './SprintColumn';
+import type { Dependency, Release } from '@/lib/types';
 
 interface ReleaseBlockProps {
-  release: Release & { sprints: (Sprint & { tasks: Task[] })[] };
+  release: Release;
   onAddSprint: (releaseId: string) => void;
   onEditRelease: (release: Release) => void;
   onDeleteRelease: (id: string) => void;
   onAddTask: (sprintId: string) => void;
-  onEditTask: (task: Task) => void;
+  onEditTask: (task: import('@/lib/types').Task) => void;
   onDeleteTask: (id: string) => void;
-  onEditSprint: (sprint: Sprint) => void;
+  onEditSprint: (sprint: import('@/lib/types').Sprint) => void;
   onDeleteSprint: (id: string) => void;
   dependencies: Dependency[];
   onJumpToTask?: (taskId: string) => void;
@@ -19,40 +19,43 @@ interface ReleaseBlockProps {
 
 export default function ReleaseBlock({
   release, onAddSprint, onEditRelease, onDeleteRelease,
-  onAddTask, onEditTask, onDeleteTask, onEditSprint, onDeleteSprint,
-  dependencies, onJumpToTask,
+  onAddTask, onEditTask, onDeleteTask,
+  onEditSprint, onDeleteSprint, dependencies, onJumpToTask,
 }: ReleaseBlockProps) {
+  const targetDate = release.targetDate
+    ? new Date(release.targetDate).toLocaleDateString()
+    : null;
+
   return (
-    <div className="flex flex-col border-2 border-gray-300 rounded-2xl bg-gray-100/50 min-w-fit">
+    <div className="flex flex-col min-w-[280px]">
       {/* Release header */}
-      <div className="px-4 py-3 bg-gray-800 text-white rounded-t-2xl">
+      <div className="mb-3 px-1">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-lg font-bold">{release.name}</h2>
-          <div className="flex gap-2">
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">{release.name}</h2>
+          <div className="flex items-center gap-2">
             <button
               onClick={() => onEditRelease(release)}
-              className="text-gray-300 hover:text-white text-xs transition-colors"
+              className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
             >
               Edit
             </button>
             <button
               onClick={() => onDeleteRelease(release.id)}
-              className="text-gray-300 hover:text-red-400 text-xs transition-colors"
+              className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
             >
               Delete
             </button>
           </div>
         </div>
-        {release.targetDate && (
-          <div className="text-xs text-gray-300 mt-0.5">Target: {release.targetDate}</div>
-        )}
-        {release.notes && (
-          <div className="text-xs text-gray-400 mt-1 italic line-clamp-2">{release.notes}</div>
+        {targetDate && (
+          <div className="text-xs text-gray-400 dark:text-gray-500">
+            Target: {targetDate}
+          </div>
         )}
       </div>
 
-      {/* Sprints row */}
-      <div className="flex gap-4 p-4 overflow-x-auto">
+      {/* Sprint columns */}
+      <div className="flex gap-4 overflow-x-auto pb-2">
         {release.sprints.map((sprint) => (
           <SprintColumn
             key={sprint.id}
@@ -67,11 +70,13 @@ export default function ReleaseBlock({
             onJumpToTask={onJumpToTask}
           />
         ))}
+
+        {/* Add sprint button */}
         <button
           onClick={() => onAddSprint(release.id)}
-          className="min-w-[180px] border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:border-gray-400 transition-colors"
+          className="min-w-[220px] max-w-[280px] h-[120px] border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-400 dark:text-gray-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors flex items-center justify-center text-sm font-medium shrink-0"
         >
-          + Add Sprint
+          + Sprint
         </button>
       </div>
     </div>

@@ -1,4 +1,4 @@
-# SoulPlan Progress — commit 7f79641 (master)
+# SoulPlan Progress — commit fc11d04 (master)
 
 ## Completed
 
@@ -26,10 +26,17 @@
 ### Task Reorder Within Sprint
 - Package: `@dnd-kit/sortable` added for sortable drag-and-drop
 - `SortableTaskCard` component: wraps task card with `useSortable` hook, handles transform/transition/drag styles
-- `SprintColumn`: wraps tasks in `SortableContext` with `verticalListSortingStrategy`
+- Source card hidden during drag (opacity: 0), CSS transition disabled during drag (transition: none)
+- `SprintColumn`: wraps tasks in `SortableContext` with `verticalListSortingStrategy`, `useDroppable` for drop target
 - `page.tsx`: `DndContext` with `PointerSensor` (5px distance activation), `handleDragStart` sets overlay task, `handleDragEnd` dispatches reorder vs cross-sprint move
 - `useTaskMutations`: added `reorderTasks()` — sends parallel `PATCH /tasks` with updated `position` for each moved task
-- Drag overlay: lightweight `DragOverlayTask` rendered while dragging (no sortable hooks)
+
+### Cross-Sprint Drag & Drop (Position-Aware)
+- `resolveDropTarget()` in transform.ts: returns `{ sprintId, insertIndex }` — drops on task → insert before it, drops on sprint column → append to end
+- `moveTaskBetweenSprints()` in transform.ts: inserts task at `insertIndex` in target sprint, removes from source, reindexes positions in both sprints
+- `moveTask()` in useTaskMutations: optimistic update via `setBoardState` before API calls, then sends PATCH for moved task + position updates for all affected tasks in target and source sprints
+- `handleDragEnd` dispatches same-sprint reorder vs cross-sprint move based on `activeSprintId === targetSprintId`
+- Known minor rough edge: cross-sprint position detection works but isn't pixel-perfect — acceptable for now
 
 ### Task Dependencies (Badge UI + CRUD)
 - **API route**: `POST/DELETE /api/dependencies` — create (with self-ref validation) and delete dependencies
@@ -42,25 +49,34 @@
   - Real-time add/remove with board refresh after each mutation
   - Task titles shown in chips; dropdown shows all other tasks across the board
 
+### Toast Notifications
+- Success/error toast on task CRUD operations
+- Toast auto-dismisses; re-fetch on error to revert optimistic updates
+
+### Empty States
+- Empty sprint columns show helpful placeholder text
+
+### "+ Task" Button
+- Fixed position in sprint header, doesn't shift when tasks are added
+
 ## Remaining Work
 
-### Feature: Zoom & Pan (Canvas Navigation)
-Scrolling horizontally/vertically across many sprints and releases is cumbersome. Need Photoshop/Miro-style canvas navigation:
-- **Hold Space + drag** to pan (hand tool)
-- **Scroll wheel** / **pinch** to zoom in/out
-- **Zoom controls**: fit-to-screen, zoom to selection, +/- buttons
-- **Minimap** (optional): bird's-eye overview with viewport indicator
-- Implementation: wrap the board in a zoomable/pannable container (e.g. `react-zoom-pan-pinch` or custom transform layer using CSS `transform: scale() translate()`)
-- `@dnd-kit` v6+ handles zoomed containers natively via `measuring={{ draggable: { frequency: 1 } }}` — only prop change needed, no architecture shift
+### Low Priority Polish
+- **Horizontal scroll for overflowed dependency tags** — minor cosmetic when many deps on one task
+- **Same-sprint reorder arrayMove index** — line 65 has `insertIndex > oldIndex ? insertIndex : insertIndex` (no-op ternary, always evaluates to `insertIndex`). Works but could be clearer with correct `arrayMove` semantics.
 
-### Future: SVG Dependency Lines
-- If badge UX proves insufficient, add SVG overlay lines between dependent tasks
-- Estimated 6-10h for cross-sprint routing, hit testing, coordinate math
-- Badge approach gives 80% value with 20% effort — SVG lines are a later polish
+### Known Architecture Debt
+- **API race condition in `moveTask`** — sends multiple PATCH requests via `Promise.all` (one per task). These can arrive out of order under rapid use, causing inconsistent positions. Consider sequential sends or a batch endpoint.
+- **`useCallback` stale `boardState` closure** — `handleDragEnd` captures `boardState` in its dependency array. If two rapid drags happen, the second sees stale state. Consider using a ref for `boardState` in DnD handlers.
+
+### Deferred (right call to skip for now)
+- **Zoom & Pan** — not needed until 10+ sprints. `@dnd-kit` v6+ handles zoomed containers natively, no architecture shift required.
+- **SVG dependency lines** — badges give 80% value with 20% effort. SVG lines are polish for later (6-10h estimated).
 
 ## Architecture Notes
 - sql.js in-memory DB, persisted to `data/soul-plan.db` via `saveToDisk()`
 - `getDb()` is module-scoped async singleton — may reset on Turbopack hot reload (known dev-mode issue)
 - Frontend hooks: `useBoard()` (fetch + reload), `useTaskMutations()` (optimistic moves, CRUD, reorder)
 - All DB mutations call `saveToDisk()` after write
-- DnD: `DndContext` wraps board, `SortableContext` per sprint column, `useSortable` per task card
+- DnD: `DndContext` wraps board, `SortableContext` per sprint column, `useSortable` per task card, `useDroppable` per sprint column for cross-sprint drops
+- **Important**: Must push via `mcp_github_create_or_update_file` — NOT `mcp_github_push_files` (corrupts JSX/TSX). Local repo is root-owned, cannot run `tsc`/`next build`.

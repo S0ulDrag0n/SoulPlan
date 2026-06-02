@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
-import { arrayMove } from '@dndkit/sortable';
+import { arrayMove } from '@dnd-kit/sortable';
 import ReleaseBlock from '@/components/ReleaseBlock';
 import EditTaskModal from '@/components/EditTaskModal';
 import EditReleaseModal from '@/components/EditReleaseModal';

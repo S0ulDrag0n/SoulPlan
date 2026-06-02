@@ -10,7 +10,7 @@ import EditReleaseModal from '@/components/EditReleaseModal';
 import EditSprintModal from '@/components/EditSprintModal';
 import { useBoard } from '@/hooks/useBoard';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
-import { findTaskById } from '@/lib/transform';
+import { moveTaskBetweenSprints, findTaskById, resolveDropTarget } from '@/lib/transform';
 import type { Task, Release, Sprint } from '@/lib/types';
 import * as api from '@/lib/api';
 

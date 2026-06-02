@@ -15,8 +15,8 @@ import type { Task, Release, Sprint } from '@/lib/types';
 import * as api from '@/lib/api';
 
 export default function Home() {
-  const { boardState, loading, error, reload } = useBoard();
-  const { saving, moveTask, createTask, saveTask, deleteTask, reorderTasks } = useTaskMutations(boardState, reload);
+  const { boardState, setBoardState, loading, error, reload } = useBoard();
+  const { saving, moveTask, createTask, saveTask, deleteTask, reorderTasks } = useTaskMutations(boardState, reload, setBoardState);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingRelease, setEditingRelease] = useState<Release | null>(null);
@@ -66,7 +66,7 @@ export default function Home() {
           .filter(t => t.id !== taskId)
           .map((t, i) => ({ id: t.id, position: i }));
         positionUpdates.push({ id: taskId, position: sprint.tasks.length - 1 });
-        await reorderTasks(positionUpdates);
+        await reorderTasks(positionUpdates, targetSprintId);
         return;
       }
 
@@ -77,7 +77,7 @@ export default function Home() {
         id: t.id,
         position: i,
       }));
-      await reorderTasks(positionUpdates);
+      await reorderTasks(positionUpdates, targetSprintId);
       return;
     }
 

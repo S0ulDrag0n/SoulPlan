@@ -18,16 +18,22 @@ interface LineEndpoints {
   sameColumn: boolean;
 }
 
-// Helper: compute tangent angle at the END of a cubic bezier.
-// For M p0 C p1 p2 p3, the tangent at p3 is p3 - p2.
-function bezierEndTangent(p0: number[], p1: number[], p2: number[], p3: number[]): number {
-  const dx = p3[0] - p2[0];
-  const dy = p3[1] - p2[1];
-  return Math.atan2(dy, dx);
+/**
+ * Compute tangent angle at the END of a cubic Bézier.
+ * For M p0 C p1 p2 p3, the tangent at p3 is (p3 - p2).
+ */
+function bezierEndTangent(p2: number[], p3: number[]): number {
+  return Math.atan2(p3[1] - p2[1], p3[0] - p2[0]);
 }
 
 /**
  * SVG overlay that draws dependency lines between task cards.
+ *
+ * Coordinate system: the SVG is `position: absolute; top:0; left:0`
+ * inside the container, so (0,0) corresponds to the container's padding-box
+ * origin. We use the SVG element's own getBoundingClientRect() as the
+ * reference frame to convert card viewport positions to SVG coords.
+ *
  * - From-task: line exits from the mid-right edge of the source card
  * - To-task: line enters the mid-left edge of the target card, with arrowhead pointing inward
  * - Same-column: loop arc exits right, curves around, re-enters left
@@ -45,9 +51,12 @@ export default function DependencyLines({ dependencies, containerRef, onDeleteDe
       const svg = svgRef.current;
       if (!container || !svg) return;
 
-      const containerRect = container.getBoundingClientRect();
+      // Use the SVG's own bounding rect as the coordinate reference.
+      // Since the SVG is `absolute top-0 left-0` inside the container,
+      // its origin is the container's padding-box origin.
+      const svgRect = svg.getBoundingClientRect();
 
-      // Size SVG to match container
+      // Size SVG to match container's scrollable area
       svg.setAttribute('width', container.scrollWidth.toString());
       svg.setAttribute('height', container.scrollHeight.toString());
 
@@ -73,43 +82,43 @@ export default function DependencyLines({ dependencies, containerRef, onDeleteDe
         const toSprint = toEl.closest('[data-sprint-id]');
         const sameColumn = !!(fromSprint && toSprint && fromSprint === toSprint);
 
+        // Convert viewport coords to SVG-local coords using the SVG's own rect
         // From: mid-right edge of source card
+        const x1 = fromRect.right - svgRect.left;
+        const y1 = fromRect.top + fromRect.height / 2 - svgRect.top;
         // To: mid-left edge of target card
-        const x1 = fromRect.right - containerRect.left;
-        const y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
-        const x2 = toRect.left - containerRect.left;
-        const y2 = toRect.top + toRect.height / 2 - containerRect.top;
+        const x2 = toRect.left - svgRect.left;
+        const y2 = toRect.top + toRect.height / 2 - svgRect.top;
 
         lines.push({ x1, y1, x2, y2, depId: dep.id, sameColumn });
       }
 
       for (const line of lines) {
         let pathD: string;
-        let p0: number[], p1: number[], p2: number[], p3: number[];
+        let p2: number[], p3: number[];
 
         if (line.sameColumn) {
           const loopWidth = 60;
-          const dy = line.y2 - line.y1;
 
-          p0 = [line.x1, line.y1];
-          p1 = [line.x1 + loopWidth, line.y1];
+          const p0 = [line.x1, line.y1];
+          const p1c = [line.x1 + loopWidth, line.y1];
           p2 = [line.x2 + loopWidth, line.y2];
           p3 = [line.x2, line.y2];
 
           pathD = [
             `M ${p0[0]} ${p0[1]}`,
-            `C ${p1[0]} ${p1[1]}, ${p2[0]} ${p2[1]}, ${p3[0]} ${p3[1]}`
+            `C ${p1c[0]} ${p1c[1]}, ${p2[0]} ${p2[1]}, ${p3[0]} ${p3[1]}`
           ].join(' ');
         } else {
           const dx = line.x2 - line.x1;
           const cpOffset = Math.max(Math.abs(dx) * 0.4, 50);
 
-          p0 = [line.x1, line.y1];
-          p1 = [line.x1 + cpOffset, line.y1];
+          const p0 = [line.x1, line.y1];
+          const p1c = [line.x1 + cpOffset, line.y1];
           p2 = [line.x2 - cpOffset, line.y2];
           p3 = [line.x2, line.y2];
 
-          pathD = `M ${p0[0]} ${p0[1]} C ${p1[0]} ${p1[1]}, ${p2[0]} ${p2[1]}, ${p3[0]} ${p3[1]}`;
+          pathD = `M ${p0[0]} ${p0[1]} C ${p1c[0]} ${p1c[1]}, ${p2[0]} ${p2[1]}, ${p3[0]} ${p3[1]}`;
         }
 
         // Main visible path
@@ -155,25 +164,25 @@ export default function DependencyLines({ dependencies, containerRef, onDeleteDe
           svg.appendChild(hitArea);
         }
 
-        // ─── Arrowhead at endpoint (mid-left edge of target card) ───
-        // Compute the tangent angle at p3 (the endpoint) from p2→p3
-        const angle = bezierEndTangent(p0, p1, p2, p3);
+        // ─── Arrowhead at the mid-left edge of the target card ───
+        // The tangent at p3 (endpoint) is along p3 - p2
+        const angle = bezierEndTangent(p2, p3);
         const arrowSize = 8;
-        const arrowAngleSpread = Math.PI / 7; // ~25° half-angle for a nice arrowhead
+        const spread = Math.PI / 7; // ~25° half-angle
 
         const tipX = line.x2;
         const tipY = line.y2;
-        const leftX = tipX - arrowSize * Math.cos(angle - arrowAngleSpread);
-        const leftY = tipY - arrowSize * Math.sin(angle - arrowAngleSpread);
-        const rightX = tipX - arrowSize * Math.cos(angle + arrowAngleSpread);
-        const rightY = tipY - arrowSize * Math.sin(angle + arrowAngleSpread);
+        const base1X = tipX - arrowSize * Math.cos(angle - spread);
+        const base1Y = tipY - arrowSize * Math.sin(angle - spread);
+        const base2X = tipX - arrowSize * Math.cos(angle + arrowSize);
+        const base2Y = tipY - arrowSize * Math.sin(angle + arrowSize);
 
         const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
         arrow.setAttribute('class', 'dep-arrow');
         arrow.setAttribute('points', [
           `${tipX},${tipY}`,
-          `${leftX},${leftY}`,
-          `${rightX},${rightY}`,
+          `${base1X},${base1Y}`,
+          `${base2X},${base2Y}`,
         ].join(' '));
         arrow.setAttribute('fill', arrowColor);
         arrow.setAttribute('opacity', '0.9');

@@ -18,13 +18,21 @@ interface LineEndpoints {
   sameColumn: boolean;
 }
 
+// Helper: compute tangent angle at the END of a cubic bezier.
+// For M p0 C p1 p2 p3, the tangent at p3 is p3 - p2.
+function bezierEndTangent(p0: number[], p1: number[], p2: number[], p3: number[]): number {
+  const dx = p3[0] - p2[0];
+  const dy = p3[1] - p2[1];
+  return Math.atan2(dy, dx);
+}
+
 /**
  * SVG overlay that draws dependency lines between task cards.
- * Uses data-task-id attributes to locate cards and compute endpoints.
- * Lines go from the right-center of the "from" card to the left-center of the "to" card.
- * For same-column dependencies, draws a loop arc that exits right, curves down/up, and re-enters left.
- * Uses cubic Bézier curves and triangle arrowheads. Supports click-to-delete on lines.
- * Re-draws on board changes, resize, pointer events (after pan/drag), and theme changes.
+ * - From-task: line exits from the mid-right edge of the source card
+ * - To-task: line enters the mid-left edge of the target card, with arrowhead pointing inward
+ * - Same-column: loop arc exits right, curves around, re-enters left
+ * - Cross-column: standard cubic Bézier
+ * - Click-to-delete on lines with wide invisible hit area
  */
 export default function DependencyLines({ dependencies, containerRef, onDeleteDependency }: DependencyLinesProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -47,11 +55,11 @@ export default function DependencyLines({ dependencies, containerRef, onDeleteDe
       const existing = svg.querySelectorAll('.dep-line, .dep-arrow, .dep-hit');
       existing.forEach(el => el.remove());
 
-      // Detect dark mode for stroke color
+      // Detect dark mode
       const isDark = document.documentElement.classList.contains('dark');
-      const lineColor = isDark ? '#64748b' : '#94a3b8'; // slate-500 : slate-400
+      const lineColor = isDark ? '#64748b' : '#94a3b8';
+      const arrowColor = isDark ? '#94a3b8' : '#64748b';
 
-      // Compute line endpoints for each dependency
       const lines: LineEndpoints[] = [];
       for (const dep of dependencies) {
         const fromEl = container.querySelector(`[data-task-id="${dep.fromTaskId}"]`) as HTMLElement | null;
@@ -61,12 +69,12 @@ export default function DependencyLines({ dependencies, containerRef, onDeleteDe
         const fromRect = fromEl.getBoundingClientRect();
         const toRect = toEl.getBoundingClientRect();
 
-        // Check if same sprint column (same parent sprint container)
         const fromSprint = fromEl.closest('[data-sprint-id]');
         const toSprint = toEl.closest('[data-sprint-id]');
         const sameColumn = !!(fromSprint && toSprint && fromSprint === toSprint);
 
-        // Convert viewport coordinates to container-relative coordinates
+        // From: mid-right edge of source card
+        // To: mid-left edge of target card
         const x1 = fromRect.right - containerRect.left;
         const y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
         const x2 = toRect.left - containerRect.left;
@@ -77,25 +85,31 @@ export default function DependencyLines({ dependencies, containerRef, onDeleteDe
 
       for (const line of lines) {
         let pathD: string;
+        let p0: number[], p1: number[], p2: number[], p3: number[];
 
         if (line.sameColumn) {
-          // Same column — draw a loop arc that exits right, curves around, and re-enters left
-          const loopWidth = 60; // How far the arc extends to the right
+          const loopWidth = 60;
           const dy = line.y2 - line.y1;
 
-          // Exit from right of source, curve right and down/up, enter left of target
+          p0 = [line.x1, line.y1];
+          p1 = [line.x1 + loopWidth, line.y1];
+          p2 = [line.x2 + loopWidth, line.y2];
+          p3 = [line.x2, line.y2];
+
           pathD = [
-            `M ${line.x1} ${line.y1}`,
-            `C ${line.x1 + loopWidth} ${line.y1}, ${line.x1 + loopWidth} ${line.y1 + dy * 0.3},`,
-            `${line.x1 + loopWidth * 0.7} ${line.y1 + dy * 0.5}`,
-            `C ${line.x1 + loopWidth * 0.4} ${line.y1 + dy * 0.7}, ${line.x2 + loopWidth * 0.7} ${line.y2},`,
-            `${line.x2} ${line.y2}`
+            `M ${p0[0]} ${p0[1]}`,
+            `C ${p1[0]} ${p1[1]}, ${p2[0]} ${p2[1]}, ${p3[0]} ${p3[1]}`
           ].join(' ');
         } else {
-          // Cross-column — standard Bézier
           const dx = line.x2 - line.x1;
           const cpOffset = Math.max(Math.abs(dx) * 0.4, 50);
-          pathD = `M ${line.x1} ${line.y1} C ${line.x1 + cpOffset} ${line.y1}, ${line.x2 - cpOffset} ${line.y2}, ${line.x2} ${line.y2}`;
+
+          p0 = [line.x1, line.y1];
+          p1 = [line.x1 + cpOffset, line.y1];
+          p2 = [line.x2 - cpOffset, line.y2];
+          p3 = [line.x2, line.y2];
+
+          pathD = `M ${p0[0]} ${p0[1]} C ${p1[0]} ${p1[1]}, ${p2[0]} ${p2[1]}, ${p3[0]} ${p3[1]}`;
         }
 
         // Main visible path
@@ -110,14 +124,14 @@ export default function DependencyLines({ dependencies, containerRef, onDeleteDe
         path.setAttribute('data-dep-id', line.depId);
         svg.appendChild(path);
 
-        // Wide invisible hit-area for click-to-delete (pointer-events enabled on this)
+        // Wide invisible hit-area for click-to-delete
         if (onDeleteDependency) {
           const hitArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           hitArea.setAttribute('class', 'dep-hit');
           hitArea.setAttribute('d', pathD);
           hitArea.setAttribute('fill', 'none');
           hitArea.setAttribute('stroke', 'transparent');
-          hitArea.setAttribute('stroke-width', '12'); // Wide hit area
+          hitArea.setAttribute('stroke-width', '12');
           hitArea.setAttribute('data-dep-id', line.depId);
           hitArea.style.pointerEvents = 'stroke';
           hitArea.style.cursor = 'pointer';
@@ -128,9 +142,8 @@ export default function DependencyLines({ dependencies, containerRef, onDeleteDe
               onDeleteDependency(id);
             }
           });
-          // Hover: highlight the visible path
           hitArea.addEventListener('mouseenter', () => {
-            path.setAttribute('stroke', isDark ? '#3b82f6' : '#2563eb'); // blue-500/600
+            path.setAttribute('stroke', isDark ? '#3b82f6' : '#2563eb');
             path.setAttribute('stroke-width', '3');
             path.setAttribute('opacity', '1');
           });
@@ -142,26 +155,28 @@ export default function DependencyLines({ dependencies, containerRef, onDeleteDe
           svg.appendChild(hitArea);
         }
 
-        // Arrowhead at the end (to-task side)
-        const arrowSize = 7;
+        // ─── Arrowhead at endpoint (mid-left edge of target card) ───
+        // Compute the tangent angle at p3 (the endpoint) from p2→p3
+        const angle = bezierEndTangent(p0, p1, p2, p3);
+        const arrowSize = 8;
+        const arrowAngleSpread = Math.PI / 7; // ~25° half-angle for a nice arrowhead
+
+        const tipX = line.x2;
+        const tipY = line.y2;
+        const leftX = tipX - arrowSize * Math.cos(angle - arrowAngleSpread);
+        const leftY = tipY - arrowSize * Math.sin(angle - arrowAngleSpread);
+        const rightX = tipX - arrowSize * Math.cos(angle + arrowAngleSpread);
+        const rightY = tipY - arrowSize * Math.sin(angle + arrowAngleSpread);
+
         const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
         arrow.setAttribute('class', 'dep-arrow');
-        if (line.sameColumn) {
-          // Arrow points left (entering target from the right side... no, from the left)
-          arrow.setAttribute('points', [
-            `${line.x2},${line.y2}`,
-            `${line.x2 + arrowSize},${line.y2 - arrowSize * 0.6}`,
-            `${line.x2 + arrowSize},${line.y2 + arrowSize * 0.6}`,
-          ].join(' '));
-        } else {
-          arrow.setAttribute('points', [
-            `${line.x2},${line.y2}`,
-            `${line.x2 - arrowSize * Math.cos(-Math.PI / 6)},${line.y2 - arrowSize * Math.sin(-Math.PI / 6)}`,
-            `${line.x2 - arrowSize * Math.cos(Math.PI / 6)},${line.y2 + arrowSize * Math.sin(Math.PI / 6)}`,
-          ].join(' '));
-        }
-        arrow.setAttribute('fill', lineColor);
-        arrow.setAttribute('opacity', '0.7');
+        arrow.setAttribute('points', [
+          `${tipX},${tipY}`,
+          `${leftX},${leftY}`,
+          `${rightX},${rightY}`,
+        ].join(' '));
+        arrow.setAttribute('fill', arrowColor);
+        arrow.setAttribute('opacity', '0.9');
         svg.appendChild(arrow);
       }
     });
@@ -179,7 +194,6 @@ export default function DependencyLines({ dependencies, containerRef, onDeleteDe
       requestAnimationFrame(() => updateLines());
     };
 
-    // Watch for dark mode class changes on <html>
     const themeObserver = new MutationObserver(() => updateLines());
     themeObserver.observe(document.documentElement, {
       attributes: true,
@@ -189,7 +203,6 @@ export default function DependencyLines({ dependencies, containerRef, onDeleteDe
     window.addEventListener('resize', onResize);
     window.addEventListener('pointerup', onPointerUp);
 
-    // ResizeObserver for DOM layout changes
     const resizeObserver = new ResizeObserver(() => updateLines());
     resizeObserver.observe(container);
 

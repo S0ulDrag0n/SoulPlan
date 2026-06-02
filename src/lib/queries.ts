@@ -121,3 +121,9 @@ export async function deleteDependency(id: string): Promise<void> {
   const db: IDatabase = await getDb();
   await db.deleteDependency(id);
 }
+
+export async function findDependency(fromTaskId: string, toTaskId: string): Promise<Dependency | null> {
+  const db: IDatabase = await getDb();
+  const row = db.findDependency(fromTaskId, toTaskId);
+  return row ? toDependency(row) : null;
+}

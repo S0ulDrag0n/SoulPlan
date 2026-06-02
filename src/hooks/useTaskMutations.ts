@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { Task, UpdateTaskInput, BoardState } from '@/lib/types';
 import { moveTaskBetweenSprints, findSprintIdForTask } from '@/lib/transform';
+import { arrayMove } from '@dnd-kit/sortable';
 import * as api from '@/lib/api';
 
 export function useTaskMutations(
@@ -21,10 +22,12 @@ export function useTaskMutations(
     if (!boardState) return;
 
     const sourceSprintId = findSprintIdForTask(boardState, taskId);
+    console.log('[moveTask] taskId:', taskId, 'sourceSprintId:', sourceSprintId, 'targetSprintId:', targetSprintId, 'insertIndex:', insertIndex);
     if (!sourceSprintId) return;
 
     // Optimistic update — apply immediately so UI doesn't rubber-band
     const optimisticState = moveTaskBetweenSprints(boardState, taskId, targetSprintId, insertIndex);
+    console.log('[moveTask] optimisticState valid:', !!optimisticState, 'releases:', optimisticState.releases.length);
     setBoardState(optimisticState);
 
     // Build position updates for all affected tasks

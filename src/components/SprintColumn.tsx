@@ -54,7 +54,14 @@ export default function SprintColumn({
             )}
           </div>
         )}
-        <div className="flex gap-2 mt-1">
+        <div className="flex items-center gap-2 mt-1">
+          <button
+            onClick={() => onAddTask(sprint.id)}
+            className="text-xs text-blue-500 hover:text-blue-700 font-medium transition-colors"
+          >
+            + Task
+          </button>
+          <span className="text-gray-300">·</span>
           <button
             onClick={() => onEditSprint(sprint)}
             className="text-xs text-gray-400 hover:text-blue-500 transition-colors"
@@ -89,16 +96,6 @@ export default function SprintColumn({
             );
           })}
         </SortableContext>
-      </div>
-
-      {/* Footer: add task */}
-      <div className="px-3 py-2 border-t border-gray-200 bg-gray-100 rounded-b-xl">
-        <button
-          onClick={() => onAddTask(sprint.id)}
-          className="text-xs text-blue-500 hover:text-blue-700 font-medium"
-        >
-          + Add Task
-        </button>
       </div>
     </div>
   );

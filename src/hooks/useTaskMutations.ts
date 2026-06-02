@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { Task, UpdateTaskInput, BoardState } from '@/lib/types';
 import { moveTaskBetweenSprints, findSprintIdForTask } from '@/lib/transform';
-import { arrayMove } from '@dnd-kit/sortable';
 import * as api from '@/lib/api';
 
 export function useTaskMutations(
@@ -13,19 +12,24 @@ export function useTaskMutations(
 ) {
   const [saving, setSaving] = useState(false);
 
+  // Ref to always-read-latest boardState in async handlers
+  const boardStateRef = useRef(boardState);
+  boardStateRef.current = boardState;
+
   /**
    * Move a task to a different sprint (or reorder within the same sprint).
    * insertIndex: where to insert in the target sprint's task list.
    *               -1 or omitted → append to end.
    */
   const moveTask = async (taskId: string, targetSprintId: string, insertIndex: number = -1): Promise<void> => {
-    if (!boardState) return;
+    const state = boardStateRef.current;
+    if (!state) return;
 
-    const sourceSprintId = findSprintIdForTask(boardState, taskId);
+    const sourceSprintId = findSprintIdForTask(state, taskId);
     if (!sourceSprintId) return;
 
     // Optimistic update — apply immediately so UI doesn't rubber-band
-    const optimisticState = moveTaskBetweenSprints(boardState, taskId, targetSprintId, insertIndex);
+    const optimisticState = moveTaskBetweenSprints(state, taskId, targetSprintId, insertIndex);
     setBoardState(optimisticState);
 
     // Build position updates for all affected tasks
@@ -38,7 +42,7 @@ export function useTaskMutations(
     try {
       setSaving(true);
 
-      // Update the moved task's sprintId + position
+      // Update the moved task's sprintId + position FIRST (sequential to avoid race)
       if (sourceSprintId !== targetSprintId) {
         const movedTask = targetSprint.tasks.find(t => t.id === taskId);
         await api.updateTask({
@@ -48,12 +52,11 @@ export function useTaskMutations(
         });
       }
 
-      // Update positions for all tasks in target sprint
-      await Promise.all(
-        targetSprint.tasks.map(t =>
-          api.updateTask({ id: t.id, position: t.position })
-        )
-      );
+      // Update positions for all tasks in target sprint sequentially
+      // (prevents race conditions where out-of-order PATCHes clobber positions)
+      for (const t of targetSprint.tasks) {
+        await api.updateTask({ id: t.id, position: t.position });
+      }
 
       // Re-index source sprint if cross-sprint move
       if (sourceSprintId !== targetSprintId) {
@@ -61,11 +64,9 @@ export function useTaskMutations(
           .flatMap(r => r.sprints)
           .find(s => s.id === sourceSprintId);
         if (sourceSprint) {
-          await Promise.all(
-            sourceSprint.tasks.map(t =>
-              api.updateTask({ id: t.id, position: t.position })
-            )
-          );
+          for (const t of sourceSprint.tasks) {
+            await api.updateTask({ id: t.id, position: t.position });
+          }
         }
       }
 
@@ -79,10 +80,11 @@ export function useTaskMutations(
 
   /** Reorder tasks within a sprint by sending position updates */
   const reorderTasks = async (positionUpdates: { id: string; position: number }[], sprintId: string) => {
-    if (!boardState) return;
+    const state = boardStateRef.current;
+    if (!state) return;
 
     // Optimistic reorder — apply immediately for smooth UX
-    const sprint = boardState.releases
+    const sprint = state.releases
       .flatMap(r => r.sprints)
       .find(s => s.id === sprintId);
     if (!sprint) return;
@@ -96,8 +98,8 @@ export function useTaskMutations(
 
     // Apply optimistic state
     const optimisticState: BoardState = {
-      ...boardState,
-      releases: boardState.releases.map(r => ({
+      ...state,
+      releases: state.releases.map(r => ({
         ...r,
         sprints: r.sprints.map(s =>
           s.id === sprintId ? { ...s, tasks: reorderedTasks } : s
@@ -108,10 +110,10 @@ export function useTaskMutations(
 
     try {
       setSaving(true);
-      // Send all position updates in parallel
-      await Promise.all(
-        positionUpdates.map(u => api.updateTask({ id: u.id, position: u.position }))
-      );
+      // Send position updates sequentially to prevent race conditions
+      for (const u of positionUpdates) {
+        await api.updateTask({ id: u.id, position: u.position });
+      }
       onBoardUpdate();
     } catch {
       onBoardUpdate(); // revert on error

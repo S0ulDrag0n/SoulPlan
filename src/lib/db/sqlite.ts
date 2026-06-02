@@ -39,6 +39,7 @@ async function initialize(): Promise<SqlJsDatabase> {
   db.run('PRAGMA foreign_keys = ON');
   migrate(db);
   migrateV2(db);
+  migrateV3(db);
   return db;
 }
 
@@ -109,6 +110,16 @@ function migrateV2(db: SqlJsDatabase): void {
   }
   if (!colNames.includes('end_date')) {
     db.run('ALTER TABLE sprints ADD COLUMN end_date TEXT');
+  }
+}
+
+function migrateV3(db: SqlJsDatabase): void {
+  // Add UNIQUE constraint on dependencies (from_task_id, to_task_id)
+  // SQLite doesn't support ALTER TABLE ADD CONSTRAINT, so we create an index
+  try {
+    db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_dep_unique ON dependencies(from_task_id, to_task_id)');
+  } catch {
+    // Index may already exist or data has duplicates — skip gracefully
   }
 }
 
@@ -329,5 +340,10 @@ class SqlJsDataAdapter implements IDatabase {
   async deleteDependenciesByTaskId(taskId: string): Promise<void> {
     this.db.run('DELETE FROM dependencies WHERE from_task_id = ? OR to_task_id = ?', [taskId, taskId]);
     saveToDisk(this.db);
+  }
+
+  async findDependency(fromTaskId: string, toTaskId: string): Promise<DependencyRow | undefined> {
+    const row = getOne(this.db, 'SELECT * FROM dependencies WHERE from_task_id = ? AND to_task_id = ?', [fromTaskId, toTaskId]);
+    return row as unknown as DependencyRow | undefined;
   }
 }

@@ -1,98 +1,69 @@
-# SoulPlan Progress — commit 85bbfe3 (master)
+# SoulPlan Progress
 
-## Completed
+## Completed Features
 
-### Release/Sprint Full CRUD (Feature 2)
-- **DB**: Added `start_date`/`end_date` columns to sprints table + `migrateV2()` for existing DBs
-- **DB adapter**: Added `updateRelease(id, fields)` and `updateSprint(id, fields)` with allow-listed column updates
-- **Types**: `SprintRow`/`Sprint` now have `start_date`/`startDate`, `end_date`/`endDate`. Added `UpdateReleaseInput`, `UpdateSprintInput`
-- **Transform**: Added `sprintToRow()` and `releaseToRow()` reverse transforms
-- **Queries**: Added `updateRelease`, `deleteRelease`, `updateSprint`, `deleteSprint` in queries.ts
-- **API routes**: `PATCH/DELETE /api/releases/[id]` and `PATCH/DELETE /api/sprints/[id]`
-- **API client**: `updateRelease`, `deleteRelease`, `updateSprint`, `deleteSprint` methods
-- **UI**: `EditReleaseModal` (name, target date, notes), `EditSprintModal` (name, capacity, start/end dates, notes)
-- **UI**: Date range display in sprint column headers (`startDate → endDate`)
-- **UI**: Confirm dialog on delete actions
+### Drag & Drop Sprint Reordering ✅
+- dnd-kit with PointerSensor (5px activation distance)
+- Optimistic reorder within sprints via `arrayMove`
+- Cross-sprint drag-and-drop with position-aware insert
+- DragOverlay ghost card with task color indicator
+- Position-aware insert for cross-sprint drops
 
-### UI Polish
-- Sprint header: capacity badge showing used/total (e.g. `3/10pt`) next to sprint name
-- Sprint header: date range + notes in subtitle, not footer
-- Sprint footer: simplified to just "+ Add Task"
-- Sprint/Release edit/delete: replaced emoji (✏️🗑️) with subtle text links (Edit / Delete)
+### Dependency System ✅
+- Tasks can depend on other tasks (from→to)
+- Dependency badges on task cards showing blocking/blocked-by counts
+- Click badge to jump to related task (scrollIntoView)
+- Orange "blocks" badges, blue "blocked by" badges
+- EditTaskModal dependency management with multi-select
 
-### Bug Fix
-- All async `q.*` query calls in route handlers were missing `await` — fixed
+### SVG Dependency Lines ✅
+- Cubic Bézier curves from right-center of source to left-center of target
+- Triangle arrowheads at target end
+- Dashed stroke style with transparency
+- Re-draws on resize, after drag/pan, and on theme changes
+- Dark mode line color adapts (slate-400 in light, slate-500 in dark)
+- MutationObserver watches `<html>` class changes for instant theme redraw
 
-### Task Reorder Within Sprint
-- Package: `@dnd-kit/sortable` added for sortable drag-and-drop
-- `SortableTaskCard` component: wraps task card with `useSortable` hook, handles transform/transition/drag styles
-- Source card hidden during drag (opacity: 0), CSS transition disabled during drag (transition: none)
-- `SprintColumn`: wraps tasks in `SortableContext` with `verticalListSortingStrategy`, `useDroppable` for drop target
-- `page.tsx`: `DndContext` with `PointerSensor` (5px distance activation), `handleDragStart` sets overlay task, `handleDragEnd` dispatches reorder vs cross-sprint move
-- `useTaskMutations`: added `reorderTasks()` — sends parallel `PATCH /tasks` with updated `position` for each moved task
+### Miro-Style Pan Canvas ✅
+- Space+drag to pan around the board (Miro-style)
+- Middle-click drag as alternative pan gesture
+- Visual hint popup on first interaction
+- Cursor feedback (grab/grabbing)
+- `stopPropagation()` prevents pan from triggering dnd-kit drag
+- DndContext wraps PanCanvas; DragOverlay outside transform to avoid double-offset
+- GPU-accelerated via `will-change: transform`
 
-### Cross-Sprint Drag & Drop (Position-Aware)
-- `resolveDropTarget()` in transform.ts: returns `{ sprintId, insertIndex }` — drops on task → insert before it, drops on sprint column → append to end
-- `moveTaskBetweenSprints()` in transform.ts: inserts task at `insertIndex` in target sprint, removes from source, reindexes positions in both sprints
-- `moveTask()` in useTaskMutations: optimistic update via `setBoardState` before API calls, then sends PATCH for moved task + position updates for all affected tasks in target and source sprints
-- `handleDragEnd` dispatches same-sprint reorder vs cross-sprint move based on `activeSprintId === targetSprintId`
-- Known minor rough edge: cross-sprint position detection works but isn't pixel-perfect — acceptable for now
+### Dark Mode ✅
+- Three-way toggle: Light → Dark → System (cycles on click)
+- `ThemeProvider` context with `localStorage` persistence (`soulplan-theme` key)
+- `ThemeToggle` component with sun/moon icons + system dot indicator
+- FOUC prevention: inline `<script>` in `<head>` reads localStorage and adds `dark` class before render
+- Tailwind v4 `@custom-variant dark` for class-based toggling
+- Applied across all components:
+  - Page layout, header, task cards, sprint columns
+  - Release blocks with hover states
+  - All modal dialogs (EditTask, EditRelease, EditSprint)
+  - Dependency line colors adapt to theme
+  - DragOverlay ghost card
+  - Scrollbar styling
+- `transition-colors` on main layout for smooth theme switching
 
-### Task Dependencies (Badge UI + CRUD)
-- **API route**: `POST/DELETE /api/dependencies` — create (with self-ref validation) and delete dependencies
-- **API client**: `createDependency(fromTaskId, toTaskId)`, `deleteDependency(id)`
-- **TaskCard badges**: orange "← blocked" chips for incoming deps, blue "→ blocks" chips for outgoing deps
-- **Badge click**: `onJumpToTask` opens the dependent task's edit modal
-- **EditTaskModal dependency section**:
-  - Shows "Blocked by" (orange) and "Blocks" (blue) chips with × remove buttons
-  - Two dropdown selectors: "Blocks →" (blue) and "← Blocked by" (orange)
-  - Real-time add/remove with board refresh after each mutation
-  - Task titles shown in chips; dropdown shows all other tasks across the board
+### Error Handling & Resilience ✅
+- CRUD operations show error toasts
+- Mutation error banner at top of page
+- EditTaskModal clears error on retry
+- EditSprintModal handles falsy-zero capacity correctly
+- 409 Conflict handling on dependency creation
 
-### SVG Dependency Lines
-- **DependencyLines component**: SVG overlay positioned absolutely over the board scroll container
-- Uses `data-task-id` attributes on task cards to locate DOM elements
-- Calculates line endpoints from right edge of "from" card to left edge of "to" card
-- Draws cubic Bézier curves with horizontal entry/exit, small arrowheads pointing right at target
-- Lines are dashed (`stroke-dasharray: 6 3`), semi-transparent, slate gray (`#94a3b8`)
-- Updates on: scroll, resize, board state changes (ResizeObserver), and after drag operations
-- `pointer-events: none` — lines don't interfere with drag-and-drop or clicks
-- `z-index: 1` — lines render below drag overlay but above sprint columns
+### Tech Debt Sprint ✅
+- sqlite.ts V3 migration with column validation
+- API route normalization (sprints, dependencies)
+- useBoard.ts: eliminated dead code and stale closures
+- adapter.ts: direct DB access, consistent error mapping
+- useTaskMutations: error state + toast feedback
 
-### Toast Notifications
-- Success/error toast on task CRUD operations
-- Mutation error toast at top-right of page with auto-dismiss
-- Inline error feedback in EditTaskModal for dependency add failures
-
-### Empty States
-- Empty sprint columns show helpful placeholder text
-
-### "+ Task" Button
-- Fixed position in sprint header, doesn't shift when tasks are added
-
-### Tech Debt Fixes (Sprint 3)
-- **Dead code removed**: Deleted unused `TaskCard.tsx` (was not imported anywhere)
-- **Falsy-zero bug fixed**: `EditSprintModal` — `capacity || undefined` → `capacity || 0` (zero capacity now persists correctly)
-- **Duplicate dependency prevention**: UNIQUE DB index via `migrateV3()`, 409 API response on duplicate, `findDependency()` query
-- **Duplicate `boardStateRef` removed**: `useTaskMutations` now receives `boardStateRef` as parameter from `page.tsx` (single source of truth)
-- **Silent errors → visible feedback**: `useTaskMutations` exposes `error` state, `page.tsx` shows transient error toast, `EditTaskModal` shows inline error text
-- **API response normalization**: All endpoints now consistently return `{ success: boolean }` (was mixed `{ ok }` / `{ success }`)
-- **Loading flash fix**: `useBoard` only shows spinner on initial load, not on background re-fetches
-
-## Remaining Work
-
-### Low Priority Polish
-- **Horizontal scroll for overflowed dependency tags** — minor cosmetic when many deps on one task
-
-### Deferred (Not Needed Yet)
-- **Zoom & Pan** — not needed until 10+ sprints. dnd-kit v6+ handles zoomed containers natively, but CSS transforms interfere with collision detection. Will add when the board scales up.
-- **SVG dependency lines for same-sprint deps** — currently lines go left-to-right across sprint columns. Within the same sprint, lines would need to curve around. The badge UX handles this well enough.
-
-## Architecture Notes
-- sql.js in-memory DB, persisted to `data/soul-plan.db` via `saveToDisk()`
-- `getDb()` is module-scoped async singleton with `migrateV3()` for UNIQUE dep index — may reset on Turbopack hot reload (known dev-mode issue)
-- Frontend hooks: `useBoard()` (fetch + reload, no flash on re-fetch), `useTaskMutations()` (optimistic moves, CRUD, reorder, error state)
-- All DB mutations call `saveToDisk()` after write
-- DnD: `DndContext` wraps board, `SortableContext` per sprint column, `useSortable` per task card (with `data-task-id` for SVG lines), `useDroppable` per sprint column
-- Dependency lines: `DependencyLines` SVG overlay in `page.tsx`, positioned absolutely inside the board's `relative flex` container
-- **Important**: Must push via `mcp_github_create_or_update_file` — NOT `mcp_github_push_files` (corrupts JSX/TSX). Local repo is root-owned, cannot run `tsc`/`next build`.
+## Architecture
+- **Stack**: Next.js 15 App Router, better-sqlite3, Tailwind CSS v4, dnd-kit
+- **Database**: `sql.sql` schema, V3 migration with column validation
+- **State**: React state + optimistic updates + background API sync
+- **Build Note**: Root-owned repo — push via GitHub MCP API only, never `mcp_github_push_files` (corrupts JSX)

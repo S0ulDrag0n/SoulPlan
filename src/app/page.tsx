@@ -3,257 +3,179 @@
 import { useState, useRef, useCallback } from 'react';
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
-import { useBoard } from '@/hooks/useBoard';
-import { useTaskMutations } from '@/hooks/useTaskMutations';
+import { arrayMove } from '@dnd-kit/sortable';
 import ReleaseBlock from '@/components/ReleaseBlock';
-import SprintColumn from '@/components/SprintColumn';
-import SortableTaskCard from '@/components/SortableTaskCard';
+import EditTaskModal from '@/components/EditTaskModal';
 import EditReleaseModal from '@/components/EditReleaseModal';
 import EditSprintModal from '@/components/EditSprintModal';
-import EditTaskModal from '@/components/EditTaskModal';
 import DependencyLines from '@/components/DependencyLines';
 import PanCanvas from '@/components/PanCanvas';
 import ThemeToggle from '@/components/ThemeToggle';
+import { useBoard } from '@/hooks/useBoard';
+import { useTaskMutations } from '@/hooks/useTaskMutations';
 import { findTaskById, resolveDropTarget } from '@/lib/transform';
-import { reorderTasks, moveTask } from '@/lib/api';
-import type { Task } from '@/lib/types';
-
-function DragOverlayTask({ task }: { task: Task }) {
-  return (
-    <div
-      className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 border-l-4"
-      style={{ borderLeftColor: task.color }}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{task.title}</span>
-        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
-          {task.estimate > 0 ? `${task.estimate}pt` : '—'}
-        </span>
-      </div>
-    </div>
-  );
-}
+import type { Task, Release, Sprint } from '@/lib/types';
+import * as api from '@/lib/api';
 
 export default function Home() {
-  const { boardState, setBoardState, saving, mutationError } = useBoard();
-  const { addTaskMutation, updateTaskMutation, deleteTaskMutation } = useTaskMutations();
+  const { boardState, setBoardState, loading, error, reload } = useBoard();
+  const { saving, error: mutationError, moveTask, createTask, saveTask, deleteTask, reorderTasks } = useTaskMutations(boardState, reload, setBoardState);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [editingRelease, setEditingRelease] = useState<typeof boardState.releases[0] | null>(null);
-  const [editingSprint, setEditingSprint] = useState<typeof boardState.sprints[0] | null>(null);
-  const [addingTaskToSprint, setAddingTaskToSprint] = useState<string | null>(null);
+  const [editingRelease, setEditingRelease] = useState<Release | null>(null);
+  const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    }),
-  );
+  // Ref to always-read-latest boardState in async DnD handlers
+  const boardStateRef = useRef(boardState);
+  boardStateRef.current = boardState;
 
+  // Ref for the scrollable board container (for dependency lines)
   const boardContainerRef = useRef<HTMLDivElement>(null);
 
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const task = findTaskById(boardState, String(active.id));
-    if (task) setActiveTask(task);
-  };
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
 
-  const handleDragEndAndRefresh = async (event: DragEndEvent) => {
+  // ─── DnD handlers ─────────────────────────────────────────
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const state = boardStateRef.current;
+    if (!state) return;
+    const task = findTaskById(state, String(event.active.id));
+    setActiveTask(task ?? null);
+  }, []);
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     setActiveTask(null);
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    const state = boardStateRef.current;
+    if (!over || !state) return;
 
-    const activeTask = findTaskById(boardState, String(active.id));
-    if (!activeTask) return;
+    const taskId = String(active.id);
 
-    const target = resolveDropTarget(boardState, over.id.toString());
-    if (!target) return;
+    // resolveDropTarget returns { sprintId, insertIndex }
+    const drop = resolveDropTarget(state, over.id);
+    if (!drop) return;
 
-    const { sprintId: targetSprintId, index: insertIndex } = target;
+    const { sprintId: targetSprintId, insertIndex } = drop;
+    const activeSprintId = findTaskById(state, taskId)?.sprintId;
 
-    if (activeTask.sprintId === targetSprintId) {
-      // Reorder within same sprint
-      const sprint = boardState.sprints.find(s => s.id === targetSprintId);
+    if (activeSprintId === targetSprintId) {
+      // Same sprint — reorder within
+      const sprint = state.releases
+        .flatMap(r => r.sprints)
+        .find(s => s.id === targetSprintId);
       if (!sprint) return;
-      const oldIndex = sprint.tasks.findIndex(t => t.id === activeTask.id);
+
+      const oldIndex = sprint.tasks.findIndex(t => t.id === taskId);
       if (oldIndex === -1) return;
-      const newIndex = insertIndex ?? sprint.tasks.length;
-      const reordered = Array.from(sprint.tasks);
-      const [moved] = reordered.splice(oldIndex, 1);
-      const adjustedIndex = newIndex > oldIndex ? newIndex - 1 : newIndex;
-      reordered.splice(adjustedIndex, 0, moved);
 
-      setBoardState(prev => ({
-        ...prev,
-        sprints: prev.sprints.map(s =>
-          s.id === targetSprintId ? { ...s, tasks: reordered } : s
-        ),
+      // If dropped on same position, no-op
+      if (oldIndex === insertIndex || (insertIndex === sprint.tasks.length && oldIndex === sprint.tasks.length - 1)) return;
+
+      // Use arrayMove for same-sprint reorder
+      const reordered = arrayMove(sprint.tasks, oldIndex, insertIndex);
+      const positionUpdates = reordered.map((t, i) => ({
+        id: t.id,
+        position: i,
       }));
-
-      try {
-        await reorderTasks(targetSprintId, reordered.map(t => t.id));
-      } catch (err) {
-        // Optimistic — will sync on next fetch
-      }
-    } else {
-      // Move between sprints
-      const targetSprint = boardState.sprints.find(s => s.id === targetSprintId);
-      const insertIndexFinal = insertIndex ?? (targetSprint?.tasks.length ?? 0);
-
-      setBoardState(prev => {
-        const sourceSprint = prev.sprints.find(s => s.id === activeTask.sprintId);
-        const destSprint = prev.sprints.find(s => s.id === targetSprintId);
-        if (!sourceSprint || !destSprint) return prev;
-
-        const updatedSourceTasks = sourceSprint.tasks.filter(t => t.id !== activeTask.id);
-
-        const destTasks = [...destSprint.tasks];
-        destTasks.splice(insertIndexFinal, 0, { ...activeTask, sprintId: targetSprintId });
-
-        return {
-          ...prev,
-          sprints: prev.sprints.map(s => {
-            if (s.id === sourceSprint.id) return { ...s, tasks: updatedSourceTasks };
-            if (s.id === destSprint.id) return { ...s, tasks: destTasks };
-            return s;
-          }),
-        };
-      });
-
-      try {
-        await moveTask(activeTask.id, targetSprintId, insertIndexFinal);
-      } catch (err) {
-        // Optimistic — will sync on next fetch
-      }
+      await reorderTasks(positionUpdates, targetSprintId);
+      return;
     }
 
-    // Refresh dependency lines after drag
-    setTimeout(() => {
-      window.dispatchEvent(new Event('pointerup'));
-    }, 50);
-  };
+    // Cross-sprint move — pass insertIndex so task lands at the right position
+    await moveTask(taskId, targetSprintId, insertIndex);
+  }, [moveTask, reorderTasks]);
 
-  const handleAddRelease = async () => {
-    try {
-      const res = await fetch('/api/releases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ boardId: boardState.board.id }),
-      });
-      if (!res.ok) throw new Error('Failed to add release');
-      setBoardState(prev => ({ ...prev, _refresh: Date.now() }));
-    } catch (err) {
-      console.error('Failed to add release:', err);
-    }
-  };
+  // Re-draw dependency lines after drag operations settle
+  const handleDragEndAndRefresh = useCallback(async (event: DragEndEvent) => {
+    await handleDragEnd(event);
+    // Lines will update via ResizeObserver and boardState change,
+    // but add a small delay for DOM to settle after drag
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+  }, [handleDragEnd]);
 
-  const handleAddSprint = async (releaseId: string) => {
-    try {
-      const res = await fetch('/api/sprints', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ releaseId, name: 'New Sprint' }),
-      });
-      if (!res.ok) throw new Error('Failed to add sprint');
-      setBoardState(prev => ({ ...prev, _refresh: Date.now() }));
-    } catch (err) {
-      console.error('Failed to add sprint:', err);
-    }
-  };
+  // ─── Jump to task (for dependency badges) ────────────────
 
-  const handleDeleteRelease = async (id: string) => {
-    if (!confirm('Delete this release and all its sprints/tasks?')) return;
-    try {
-      const res = await fetch(`/api/releases/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete release');
-      setBoardState(prev => ({ ...prev, _refresh: Date.now() }));
-    } catch (err) {
-      console.error('Failed to delete release:', err);
-    }
-  };
+  const handleJumpToTask = useCallback((taskId: string) => {
+    const state = boardStateRef.current;
+    if (!state) return;
+    const task = findTaskById(state, taskId);
+    if (task) setEditingTask(task);
+  }, []);
 
-  const handleDeleteSprint = async (id: string) => {
-    if (!confirm('Delete this sprint and all its tasks?')) return;
-    try {
-      const res = await fetch(`/api/sprints/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete sprint');
-      setBoardState(prev => ({ ...prev, _refresh: Date.now() }));
-    } catch (err) {
-      console.error('Failed to delete sprint:', err);
-    }
-  };
+  // ─── CRUD handlers ────────────────────────────────────────
 
-  const handleAddTask = (sprintId: string) => setAddingTaskToSprint(sprintId);
+  const handleAddRelease = useCallback(async () => {
+    const state = boardStateRef.current;
+    if (!state) return;
+    await api.createRelease({ boardId: state.board.id, name: `Release ${state.releases.length + 1}` });
+    reload();
+  }, [reload]);
 
-  const handleEditRelease = (release: typeof boardState.releases[0]) => setEditingRelease(release);
-  const handleEditSprint = (sprint: typeof boardState.sprints[0]) => setEditingSprint(sprint);
+  const handleAddSprint = useCallback(async (releaseId: string) => {
+    const state = boardStateRef.current;
+    const release = state?.releases.find(r => r.id === releaseId);
+    await api.createSprint({ releaseId, name: `Sprint ${(release?.sprints.length ?? 0) + 1}` });
+    reload();
+  }, [reload]);
 
-  const handleJumpToTask = (taskId: string) => {
-    const el = document.querySelector(`[data-task-id="${taskId}"]`) as HTMLElement;
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
+  const handleAddTask = useCallback(async (sprintId: string) => {
+    await createTask(sprintId, 'New Task');
+  }, [createTask]);
 
-  // Auto-create task
-  const handleTaskCreated = async (sprintId: string, title: string) => {
-    setAddingTaskToSprint(null);
-    try {
-      await addTaskMutation({ sprintId, title, estimate: 0, color: '#6366f1' });
-      setBoardState(prev => ({ ...prev, _refresh: Date.now() }));
-    } catch (err) {
-      console.error('Failed to create task:', err);
-    }
-  };
-
-  const handleSaveTask = async (task: Task) => {
+  const handleSaveTask = useCallback(async (task: Task) => {
+    await saveTask(task);
     setEditingTask(null);
-    try {
-      await updateTaskMutation(task);
-      setBoardState(prev => ({ ...prev, _refresh: Date.now() }));
-    } catch (err) {
-      console.error('Failed to save task:', err);
-    }
-  };
+  }, [saveTask]);
 
-  const handleDeleteTask = async (id: string) => {
-    try {
-      await deleteTaskMutation(id);
-      setBoardState(prev => ({ ...prev, _refresh: Date.now() }));
-    } catch (err) {
-      console.error('Failed to delete task:', err);
-    }
-  };
+  const handleDeleteTask = useCallback(async (id: string) => {
+    await deleteTask(id);
+  }, [deleteTask]);
 
-  const handleSaveRelease = async (id: string, data: { name?: string; targetDate?: string | null; notes?: string | null }) => {
+  const handleEditRelease = useCallback(async (id: string, data: { name?: string; targetDate?: string | null; notes?: string | null }) => {
+    await api.updateRelease(id, data);
     setEditingRelease(null);
-    try {
-      const res = await fetch(`/api/releases/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error('Failed to save release');
-      setBoardState(prev => ({ ...prev, _refresh: Date.now() }));
-    } catch (err) {
-      console.error('Failed to save release:', err);
-    }
-  };
+    reload();
+  }, [reload]);
 
-  const handleSaveSprint = async (id: string, data: {
+  const handleDeleteRelease = useCallback(async (id: string) => {
+    if (!confirm('Delete this release and all its sprints and tasks?')) return;
+    await api.deleteRelease(id);
+    reload();
+  }, [reload]);
+
+  const handleEditSprint = useCallback(async (id: string, data: {
     name?: string; capacity?: number; capacityUnit?: string;
     startDate?: string | null; endDate?: string | null; notes?: string | null;
   }) => {
+    await api.updateSprint(id, data);
     setEditingSprint(null);
-    try {
-      const res = await fetch(`/api/sprints/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error('Failed to save sprint');
-      setBoardState(prev => ({ ...prev, _refresh: Date.now() }));
-    } catch (err) {
-      console.error('Failed to save sprint:', err);
-    }
-  };
+    reload();
+  }, [reload]);
+
+  const handleDeleteSprint = useCallback(async (id: string) => {
+    if (!confirm('Delete this sprint and all its tasks?')) return;
+    await api.deleteSprint(id);
+    reload();
+  }, [reload]);
+
+  // ─── Render ───────────────────────────────────────────────
+
+  if (loading && !boardState) {
+    return <div className="p-8 text-gray-500 dark:text-gray-400">Loading...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <div className="text-red-600 dark:text-red-400 font-medium">Error: {error}</div>
+        <button onClick={reload} className="mt-2 text-blue-600 dark:text-blue-400 hover:underline">Retry</button>
+      </div>
+    );
+  }
+
+  if (!boardState) return null;
 
   const allDependencies = boardState.dependencies;
 
@@ -265,7 +187,6 @@ export default function Home() {
           {mutationError}
         </div>
       )}
-
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between shrink-0">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{boardState.board.name}</h1>
@@ -285,20 +206,19 @@ export default function Home() {
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEndAndRefresh}>
         <PanCanvas className="flex-1">
           <div ref={boardContainerRef} className="relative p-8">
-            <DependencyLines dependencies={allDependencies} containerRef={boardContainerRef} />
-
-            <div className="flex gap-8">
-              {boardState.releases.map(release => (
+            <div className="relative flex gap-6 min-h-[400px]">
+              <DependencyLines dependencies={allDependencies} containerRef={boardContainerRef} />
+              {boardState.releases.map((release) => (
                 <ReleaseBlock
                   key={release.id}
                   release={release}
                   onAddSprint={handleAddSprint}
-                  onEditRelease={handleEditRelease}
+                  onEditRelease={setEditingRelease}
                   onDeleteRelease={handleDeleteRelease}
                   onAddTask={handleAddTask}
-                  onEditTask={task => setEditingTask(task)}
+                  onEditTask={setEditingTask}
                   onDeleteTask={handleDeleteTask}
-                  onEditSprint={handleEditSprint}
+                  onEditSprint={setEditingSprint}
                   onDeleteSprint={handleDeleteSprint}
                   dependencies={allDependencies}
                   onJumpToTask={handleJumpToTask}
@@ -308,38 +228,13 @@ export default function Home() {
           </div>
         </PanCanvas>
 
+        {/* DragOverlay outside PanCanvas so it's not affected by pan transform */}
         <DragOverlay>
           {activeTask ? <DragOverlayTask task={activeTask} /> : null}
         </DragOverlay>
       </DndContext>
 
-      {/* Add Task quick-create */}
-      {addingTaskToSprint && (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center z-50" onClick={() => setAddingTaskToSprint(null)}>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-[400px] shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-gray-100">New Task</h3>
-            <input
-              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-              placeholder="Task title..."
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                  handleTaskCreated(addingTaskToSprint, e.currentTarget.value.trim());
-                }
-              }}
-            />
-            <div className="flex gap-2 mt-4 justify-end">
-              <button onClick={() => setAddingTaskToSprint(null)} className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">Cancel</button>
-              <button onClick={() => {
-                const input = document.querySelector('input[placeholder="Task title..."]') as HTMLInputElement;
-                if (input?.value.trim()) handleTaskCreated(addingTaskToSprint, input.value.trim());
-              }} className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-600">Create</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit modals */}
+      {/* Modals */}
       {editingTask && (
         <EditTaskModal
           task={editingTask}
@@ -351,17 +246,34 @@ export default function Home() {
       {editingRelease && (
         <EditReleaseModal
           release={editingRelease}
-          onSave={handleSaveRelease}
+          onSave={handleEditRelease}
           onClose={() => setEditingRelease(null)}
         />
       )}
       {editingSprint && (
         <EditSprintModal
           sprint={editingSprint}
-          onSave={handleSaveSprint}
-          onClose={() => setEditingSprint(null)}
+          onSave={handleEditSprint}
+          onClose={() =>setEditingSprint(null)}
         />
       )}
+    </div>
+  );
+}
+
+/** Lightweight task card for the drag overlay (no sortable hooks) */
+function DragOverlayTask({ task }: { task: Task }) {
+  return (
+    <div
+      className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 border-l-4"
+      style={{ borderLeftColor: task.color }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{task.title}</span>
+        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
+          {task.estimate > 0 ? `${task.estimate}pt` : '—'}
+        </span>
+      </div>
     </div>
   );
 }

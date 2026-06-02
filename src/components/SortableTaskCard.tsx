@@ -46,16 +46,16 @@ export default function SortableTaskCard({
       style={style}
       {...attributes}
       {...listeners}
-      className="bg-white rounded-lg shadow-sm p-3 mb-2 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow"
+      className="bg-white dark:bg-gray-800 rounded-lg shadow-sm dark:shadow-gray-900/30 p-3 mb-2 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow"
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-gray-800 flex-1">{task.title}</span>
-        <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+        <span className="text-sm font-medium text-gray-800 dark:text-gray-100 flex-1">{task.title}</span>
+        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
           {task.estimate > 0 ? `${task.estimate}pt` : '—'}
         </span>
       </div>
       {task.isCritical && (
-        <span className="text-xs text-red-600 font-semibold mt-1 inline-block">⚡ Critical</span>
+        <span className="text-xs text-red-600 dark:text-red-400 font-semibold mt-1 inline-block">⚡ Critical</span>
       )}
 
       {/* Dependency badges */}
@@ -65,7 +65,7 @@ export default function SortableTaskCard({
             <button
               key={dep.id}
               onClick={(e) => { e.stopPropagation(); onJumpToTask?.(dep.fromTaskId); }}
-              className="text-[10px] leading-tight px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
+              className="text-[10px] leading-tight px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800/50 transition-colors"
               title={`Blocked by task ${dep.fromTaskId}`}
             >
               ← blocked
@@ -75,7 +75,7 @@ export default function SortableTaskCard({
             <button
               key={dep.id}
               onClick={(e) => { e.stopPropagation(); onJumpToTask?.(dep.toTaskId); }}
-              className="text-[10px] leading-tight px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+              className="text-[10px] leading-tight px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors"
               title={`Blocks task ${dep.toTaskId}`}
             >
               → blocks
@@ -87,13 +87,13 @@ export default function SortableTaskCard({
       <div className="flex gap-1 mt-2">
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(task); }}
-          className="text-xs text-gray-400 hover:text-blue-500"
+          className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400"
         >
           Edit
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); if (confirm('Delete this task?')) onDelete(task.id); }}
-          className="text-xs text-gray-400 hover:text-red-500"
+          className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400"
         >
           Delete
         </button>

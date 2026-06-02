@@ -78,7 +78,7 @@ export default function EditSprintModal({ sprint, onSave, onClose }: EditSprintM
           <button
             onClick={() => onSave(sprint.id, {
               name: name || undefined,
-              capacity: capacity || undefined,
+              capacity: capacity || 0,
               startDate: startDate || null,
               endDate: endDate || null,
               notes: notes || null,

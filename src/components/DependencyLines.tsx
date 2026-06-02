@@ -83,12 +83,9 @@ export default function DependencyLines({ dependencies, containerRef }: Dependen
         svg.appendChild(path);
 
         // Arrowhead at the end (to-task side)
+        // The curve always enters the target card horizontally (tangent points right)
         const arrowSize = 6;
-        // Calculate the tangent direction at the end of the Bézier
-        // The tangent at t=1 for cubic Bézier M(p0) C(p1,p2,p3) is 3*(p3-p2)
-        const cp2x = line.x2 - cpOffset;
-        const cp2y = line.y2;
-        const angle = Math.atan2(line.y2 - cp2y, line.x2 - cp2x);
+        const angle = 0; // horizontal entry from left
 
         const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
         arrow.setAttribute('class', 'dep-arrow');

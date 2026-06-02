@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
-import { arrayMove } from '@dnd-kit/sortable';
+import { arrayMove } from '@dndkit/sortable';
 import ReleaseBlock from '@/components/ReleaseBlock';
 import EditTaskModal from '@/components/EditTaskModal';
 import EditReleaseModal from '@/components/EditReleaseModal';
@@ -16,7 +16,7 @@ import * as api from '@/lib/api';
 
 export default function Home() {
   const { boardState, setBoardState, loading, error, reload } = useBoard();
-  const { saving, moveTask, createTask, saveTask, deleteTask, reorderTasks } = useTaskMutations(boardState, reload, setBoardState);
+  const { saving, error: mutationError, moveTask, createTask, saveTask, deleteTask, reorderTasks } = useTaskMutations(boardState, reload, setBoardState);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingRelease, setEditingRelease] = useState<Release | null>(null);
@@ -68,8 +68,6 @@ export default function Home() {
       if (oldIndex === insertIndex || (insertIndex === sprint.tasks.length && oldIndex === sprint.tasks.length - 1)) return;
 
       // Use arrayMove for same-sprint reorder
-      // When dragging item at oldIndex onto item at insertIndex,
-      // arrayMove moves oldIndex → insertIndex (in original array coords)
       const reordered = arrayMove(sprint.tasks, oldIndex, insertIndex);
       const positionUpdates = reordered.map((t, i) => ({
         id: t.id,
@@ -169,6 +167,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Mutation error toast */}
+      {mutationError && (
+        <div className="fixed top-4 right-4 z-50 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium animate-pulse">
+          {mutationError}
+        </div>
+      )}
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">{boardState.board.name}</h1>
@@ -230,7 +234,7 @@ export default function Home() {
         <EditSprintModal
           sprint={editingSprint}
           onSave={handleEditSprint}
-          onClose={() => setEditingSprint(null)}
+          onClose={() =>setEditingSprint(null)}
         />
       )}
     </div>

@@ -35,40 +35,42 @@ export default function SprintColumn({
     <div
       ref={setNodeRef}
       className={`min-w-[220px] max-w-[280px] flex flex-col rounded-xl border-2 transition-colors ${
-        isOver ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-gray-50'
+        isOver
+          ? 'border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+          : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'
       }`}
     >
       {/* Sprint header */}
-      <div className="px-3 py-2 border-b border-gray-200 bg-white rounded-t-xl">
+      <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-xl">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-gray-700 truncate">{sprint.name}</h3>
-          <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded shrink-0">
+          <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200 truncate">{sprint.name}</h3>
+          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded shrink-0">
             {usedCapacity}/{sprint.capacity}{sprint.capacityUnit}
           </span>
         </div>
         {dateRange && (
-          <div className="text-xs text-gray-400 mt-0.5">{dateRange}</div>
+          <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{dateRange}</div>
         )}
         {sprint.notes && (
-          <div className="text-xs text-gray-500 italic mt-0.5 line-clamp-2">{sprint.notes}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 italic mt-0.5 line-clamp-2">{sprint.notes}</div>
         )}
         <div className="flex items-center gap-2 mt-1">
           <button
             onClick={() => onAddTask(sprint.id)}
-            className="text-xs text-blue-500 hover:text-blue-700 font-medium transition-colors"
+            className="text-xs text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
           >
             + Task
           </button>
-          <span className="text-gray-300">·</span>
+          <span className="text-gray-300 dark:text-gray-600">·</span>
           <button
             onClick={() => onEditSprint(sprint)}
-            className="text-xs text-gray-400 hover:text-blue-500 transition-colors"
+            className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
           >
             Edit
           </button>
           <button
             onClick={() => onDeleteSprint(sprint.id)}
-            className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+            className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
           >
             Delete
           </button>

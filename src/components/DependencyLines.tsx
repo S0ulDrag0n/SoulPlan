@@ -18,10 +18,9 @@ interface LineEndpoints {
 /**
  * SVG overlay that draws dependency lines between task cards.
  * Uses data-task-id attributes to locate cards and compute endpoints.
- * Lines go from the right edge of the "from" card to the left edge of the "to" card.
- *
- * Works with the pannable canvas: uses the board container reference
- * to compute SVG dimensions and element positions correctly.
+ * Lines go from the right-center of the "from" card to the left-center of the "to" card.
+ * Uses cubic Bézier curves for smooth paths and triangle arrowheads at the target end.
+ * Re-draws on board changes, resize, pointer events (after pan/drag), and theme changes.
  */
 export default function DependencyLines({ dependencies, containerRef }: DependencyLinesProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -30,33 +29,34 @@ export default function DependencyLines({ dependencies, containerRef }: Dependen
   const updateLines = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
-      if (!svgRef.current || !containerRef.current) return;
-
       const container = containerRef.current;
+      const svg = svgRef.current;
+      if (!container || !svg) return;
 
-      // Size the SVG to match the full board content area
-      svgRef.current.setAttribute('width', String(container.scrollWidth));
-      svgRef.current.setAttribute('height', String(container.scrollHeight));
+      // We need the pan wrapper that contains the actual board content
+      const panWrapper = container.firstElementChild as HTMLElement | null;
+      // Use the container scroll/position as the reference frame
+      const containerRect = container.getBoundingClientRect();
 
-      // Calculate line endpoints for each dependency
-      // Use offsetLeft/offsetTop relative to the container for positioning
+      // Size SVG to match container
+      svg.setAttribute('width', container.scrollWidth.toString());
+      svg.setAttribute('height', container.scrollHeight.toString());
+
+      // Remove old lines
+      const existing = svg.querySelectorAll('.dep-line, .dep-arrow');
+      existing.forEach(el => el.remove());
+
+      // Compute line endpoints for each dependency
       const lines: LineEndpoints[] = [];
-
       for (const dep of dependencies) {
-        const fromEl = container.querySelector(`[data-task-id="${dep.fromTaskId}"]`);
-        const toEl = container.querySelector(`[data-task-id="${dep.toTaskId}"]`);
+        const fromEl = container.querySelector(`[data-task-id="${dep.fromTaskId}"]`) as HTMLElement | null;
+        const toEl = container.querySelector(`[data-task-id="${dep.toTaskId}"]`) as HTMLElement | null;
         if (!fromEl || !toEl) continue;
-
-        // getBoundingClientRect gives viewport coords — we need coords relative
-        // to the container's scrollable content area.
-        // Since the container is inside a CSS transform, getBoundingClientRect
-        // already accounts for the pan offset, so we compute relative to container.
-        const containerRect = container.getBoundingClientRect();
 
         const fromRect = fromEl.getBoundingClientRect();
         const toRect = toEl.getBoundingClientRect();
 
-        // Relative to container top-left, accounting for container's scroll
+        // Convert viewport coordinates to container-relative coordinates
         const x1 = fromRect.right - containerRect.left;
         const y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
         const x2 = toRect.left - containerRect.left;
@@ -65,12 +65,9 @@ export default function DependencyLines({ dependencies, containerRef }: Dependen
         lines.push({ x1, y1, x2, y2 });
       }
 
-      // Build SVG path elements
-      const svg = svgRef.current;
-
-      // Clear previous lines
-      const existing = svg.querySelectorAll('.dep-line, .dep-arrow');
-      existing.forEach(el => el.remove());
+      // Detect dark mode for stroke color
+      const isDark = document.documentElement.classList.contains('dark');
+      const lineColor = isDark ? '#64748b' : '#94a3b8'; // slate-500 : slate-400
 
       for (const line of lines) {
         // Control points for a smooth Bézier curve
@@ -82,7 +79,7 @@ export default function DependencyLines({ dependencies, containerRef }: Dependen
         path.setAttribute('class', 'dep-line');
         path.setAttribute('d', `M ${line.x1} ${line.y1} C ${line.x1 + cpOffset} ${line.y1}, ${line.x2 - cpOffset} ${line.y2}, ${line.x2} ${line.y2}`);
         path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', '#94a3b8');
+        path.setAttribute('stroke', lineColor);
         path.setAttribute('stroke-width', '2');
         path.setAttribute('stroke-dasharray', '6 3');
         path.setAttribute('opacity', '0.7');
@@ -96,9 +93,9 @@ export default function DependencyLines({ dependencies, containerRef }: Dependen
         arrow.setAttribute('points', [
           `${line.x2},${line.y2}`,
           `${line.x2 - arrowSize * Math.cos(-Math.PI / 6)},${line.y2 - arrowSize * Math.sin(-Math.PI / 6)}`,
-          `${line.x2 - arrowSize * Math.cos(Math.PI / 6)},${line.y2 - arrowSize * Math.sin(Math.PI / 6)}`,
+          `${line.x2 - arrowSize * Math.cos(Math.PI / 6)},${line.y2 + arrowSize * Math.sin(Math.PI / 6)}`,
         ].join(' '));
-        arrow.setAttribute('fill', '#94a3b8');
+        arrow.setAttribute('fill', lineColor);
         arrow.setAttribute('opacity', '0.7');
         svg.appendChild(arrow);
       }
@@ -106,6 +103,7 @@ export default function DependencyLines({ dependencies, containerRef }: Dependen
   }, [dependencies, containerRef]);
 
   // Recalculate lines on mount, board changes, resize, and pointer up (after pan)
+  // Also re-draw on theme changes (dark/light mode affects line color)
   useEffect(() => {
     updateLines();
 
@@ -119,18 +117,26 @@ export default function DependencyLines({ dependencies, containerRef }: Dependen
       requestAnimationFrame(() => updateLines());
     };
 
+    // Watch for dark mode class changes on <html>
+    const themeObserver = new MutationObserver(() => updateLines());
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
     window.addEventListener('resize', onResize);
     window.addEventListener('pointerup', onPointerUp);
 
     // ResizeObserver for DOM layout changes (task add/remove, etc.)
-    const observer = new ResizeObserver(() => updateLines());
-    observer.observe(container);
+    const resizeObserver = new ResizeObserver(() => updateLines());
+    resizeObserver.observe(container);
 
     return () => {
       cancelAnimationFrame(rafRef.current);
       window.removeEventListener('resize', onResize);
       window.removeEventListener('pointerup', onPointerUp);
-      observer.disconnect();
+      resizeObserver.disconnect();
+      themeObserver.disconnect();
     };
   }, [updateLines, containerRef]);
 

@@ -1,41 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import * as q from '@/lib/queries';
 
-// POST /api/dependencies — create a dependency
-export async function POST(request: NextRequest) {
+// POST /api/dependencies — create a dependency (fromTaskId → toTaskId meaning "from blocks to")
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await req.json();
     const { fromTaskId, toTaskId } = body;
-
     if (!fromTaskId || !toTaskId) {
-      return NextResponse.json({ error: 'fromTaskId and toTaskId are required' }, { status: 400 });
+      return NextResponse.json({ error: 'fromTaskId and toTaskId required' }, { status: 400 });
     }
     if (fromTaskId === toTaskId) {
       return NextResponse.json({ error: 'Cannot create self-referencing dependency' }, { status: 400 });
     }
-
-    const dependency = await prisma.dependency.create({
-      data: { fromTaskId, toTaskId },
-    });
-    return NextResponse.json(dependency, { status: 201 });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    const dep = await q.createDependency(fromTaskId, toTaskId);
+    return NextResponse.json(dep);
+  } catch (error) {
+    console.error('POST /api/dependencies error:', error);
+    return NextResponse.json({ error: 'Failed to create dependency' }, { status: 500 });
   }
 }
 
-// DELETE /api/dependencies?id=xxx — delete a dependency
-export async function DELETE(request: NextRequest) {
+// DELETE /api/dependencies — delete a dependency by id
+export async function DELETE(req: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
+    const { id } = await req.json();
     if (!id) {
-      return NextResponse.json({ error: 'id query parameter is required' }, { status: 400 });
+      return NextResponse.json({ error: 'id required' }, { status: 400 });
     }
-    await prisma.dependency.delete({ where: { id } });
-    return new NextResponse(null, { status: 204 });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    await q.deleteDependency(id);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('DELETE /api/dependencies error:', error);
+    return NextResponse.json({ error: 'Failed to delete dependency' }, { status: 500 });
   }
 }

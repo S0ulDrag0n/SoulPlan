@@ -8,7 +8,7 @@ interface ReleaseBlockProps {
   onAddSprint: (releaseId: string) => void;
   onEditRelease: (release: Release) => void;
   onDeleteRelease: (id: string) => void;
-  onAddTask: (sprintId: string) > void;
+  onAddTask: (sprintId: string) => void;
   onEditTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onEditSprint: (sprint: Sprint) => void;

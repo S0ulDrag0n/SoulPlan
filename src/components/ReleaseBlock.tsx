@@ -46,6 +46,9 @@ export default function ReleaseBlock({
         {release.targetDate && (
           <div className="text-xs text-gray-300 mt-0.5">Target: {release.targetDate}</div>
         )}
+        {release.notes && (
+          <div className="text-xs text-gray-400 mt-1 italic line-clamp-2">{release.notes}</div>
+        )}
       </div>
 
       {/* Sprints row */}

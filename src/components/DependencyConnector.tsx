@@ -7,7 +7,8 @@ import type { Dependency } from '@/lib/types';
 
 interface ConnectionMode {
   sourceTaskId: string;
-  sourceEl: HTMLElement;
+  /** The connector button element (🔗) — temp line starts from here */
+  sourceHandleEl: HTMLElement;
 }
 
 interface DependencyConnectorState {
@@ -16,7 +17,7 @@ interface DependencyConnectorState {
 }
 
 interface DependencyConnectorContextValue extends DependencyConnectorState {
-  startConnection: (taskId: string, el: HTMLElement) => void;
+  startConnection: (taskId: string, handleEl: HTMLElement) => void;
   cancelConnection: () => void;
   setHoveredTaskId: (id: string | null) => void;
   containerRef: React.RefObject<HTMLElement | null>;
@@ -50,19 +51,16 @@ export function DependencyConnectorProvider({
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
 
   // ── Refs to avoid stale closures in event listeners ──
-  // Event listeners are registered ONCE and never torn down/re-registered,
-  // so they use refs to always read the latest state.
   const connectionModeRef = useRef<ConnectionMode | null>(null);
   const dependenciesRef = useRef(dependenciesProp);
   const onCreateDependencyRef = useRef(onCreateDependency);
 
-  // Keep refs in sync with latest props/state on every render
   connectionModeRef.current = connectionMode;
   dependenciesRef.current = dependenciesProp;
   onCreateDependencyRef.current = onCreateDependency;
 
-  const startConnection = useCallback((taskId: string, el: HTMLElement) => {
-    setConnectionMode({ sourceTaskId: taskId, sourceEl: el });
+  const startConnection = useCallback((taskId: string, handleEl: HTMLElement) => {
+    setConnectionMode({ sourceTaskId: taskId, sourceHandleEl: handleEl });
     setHoveredTaskId(null);
     setCursorPos(null);
   }, []);
@@ -73,9 +71,7 @@ export function DependencyConnectorProvider({
     setCursorPos(null);
   }, []);
 
-  // ── Register window-level listeners ONCE (no dependency on connectionMode) ──
-  // This avoids the race condition where tearing down/re-adding listeners
-  // when connectionMode changes could cause a missed pointerup event.
+  // ── Register window-level listeners ONCE ──
   useEffect(() => {
     const handlePointerMove = (e: PointerEvent) => {
       const cm = connectionModeRef.current;
@@ -83,13 +79,11 @@ export function DependencyConnectorProvider({
 
       setCursorPos({ x: e.clientX, y: e.clientY });
 
-      // Find which task card is under the cursor
       const elUnder = document.elementFromPoint(e.clientX, e.clientY);
       if (elUnder) {
         const taskCard = (elUnder as HTMLElement).closest('[data-task-id]');
         const taskId = taskCard ? (taskCard as HTMLElement).getAttribute('data-task-id') : null;
 
-        // Prevent self-connections & duplicates
         if (taskId && taskId === cm.sourceTaskId) {
           setHoveredTaskId(null);
           return;
@@ -114,7 +108,6 @@ export function DependencyConnectorProvider({
       const cm = connectionModeRef.current;
       if (!cm) return;
 
-      // Find target task card under cursor
       const elUnder = document.elementFromPoint(e.clientX, e.clientY);
       const taskCard = elUnder ? (elUnder as HTMLElement).closest('[data-task-id]') : null;
       const targetTaskId = taskCard
@@ -128,19 +121,14 @@ export function DependencyConnectorProvider({
           (d) => d.fromTaskId === cm.sourceTaskId && d.toTaskId === targetTaskId
         )
       ) {
-        // Fire-and-forget: clean up connection mode immediately, then create dependency
         setConnectionMode(null);
         setHoveredTaskId(null);
         setCursorPos(null);
 
-        // Call the API — errors are handled by the page-level handler
-        onCreateDependencyRef.current(cm.sourceTaskId, targetTaskId).catch(() => {
-          // Silently fail — the page-level reload will sync state
-        });
+        onCreateDependencyRef.current(cm.sourceTaskId, targetTaskId).catch(() => {});
         return;
       }
 
-      // No valid target — just clean up
       setConnectionMode(null);
       setHoveredTaskId(null);
       setCursorPos(null);
@@ -163,23 +151,27 @@ export function DependencyConnectorProvider({
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []); // Empty deps — listeners registered once, never re-created
+  }, []);
 
-  // Compute temp line endpoints (relative to viewport for fixed-position SVG)
+  // Compute temp line endpoints:
+  // Start: center of the 🔗 connector button
+  // End: mid-left edge of hovered target card, or cursor position
   const tempLine: { x1: number; y1: number; x2: number; y2: number } | null = connectionMode
     ? (() => {
-        const sourceRect = connectionMode.sourceEl.getBoundingClientRect();
-        // Line starts from the connector handle (bottom-right of card)
-        const x1 = sourceRect.right - 4;
-        const y1 = sourceRect.bottom - 4;
-        // Line ends at cursor (or center of hovered card)
+        const handleRect = connectionMode.sourceHandleEl.getBoundingClientRect();
+        const x1 = handleRect.left + handleRect.width / 2;
+        const y1 = handleRect.top + handleRect.height / 2;
+
         if (hoveredTaskId && containerRef.current) {
           const targetEl = containerRef.current.querySelector(
             `[data-task-id="${hoveredTaskId}"]`
           );
           if (targetEl) {
             const targetRect = targetEl.getBoundingClientRect();
-            return { x1, y1, x2: targetRect.left + 4, y2: targetRect.top + targetRect.height / 2 };
+            // Snap to mid-left edge of target card
+            const x2 = targetRect.left;
+            const y2 = targetRect.top + targetRect.height / 2;
+            return { x1, y1, x2, y2 };
           }
         }
         return cursorPos ? { x1, y1, x2: cursorPos.x, y2: cursorPos.y } : null;
@@ -199,7 +191,7 @@ export function DependencyConnectorProvider({
     >
       {children}
 
-      {/* Temporary connection line overlay (fixed position, covers viewport) */}
+      {/* Temporary connection line overlay */}
       {connectionMode ? (
         tempLine ? (
           <svg
@@ -220,9 +212,9 @@ export function DependencyConnectorProvider({
               opacity="0.8"
               markerEnd="url(#conn-arrow)"
             />
-            {/* Source dot */}
+            {/* Source dot on connector button */}
             <circle cx={tempLine.x1} cy={tempLine.y1} r="5" fill="#3b82f6" opacity="0.9" />
-            {/* Target dot when hovering a card */}
+            {/* Target dot on hovered card left edge */}
             {hoveredTaskId ? (
               <circle cx={tempLine.x2} cy={tempLine.y2} r="5" fill="#10b981" opacity="0.9" />
             ) : null}

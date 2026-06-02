@@ -11,10 +11,17 @@ export function useTaskMutations(
   setBoardState: (state: BoardState) => void
 ) {
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Ref to always-read-latest boardState in async handlers
   const boardStateRef = useRef(boardState);
   boardStateRef.current = boardState;
+
+  /** Show a transient error that auto-clears after 3s */
+  const showError = (message: string) => {
+    setError(message);
+    setTimeout(() => setError(null), 3000);
+  };
 
   /**
    * Move a task to a different sprint (or reorder within the same sprint).
@@ -53,7 +60,6 @@ export function useTaskMutations(
       }
 
       // Update positions for all tasks in target sprint sequentially
-      // (prevents race conditions where out-of-order PATCHes clobber positions)
       for (const t of targetSprint.tasks) {
         await api.updateTask({ id: t.id, position: t.position });
       }
@@ -71,7 +77,8 @@ export function useTaskMutations(
       }
 
       onBoardUpdate();
-    } catch {
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to move task');
       onBoardUpdate(); // re-fetch on error to revert optimistic update
     } finally {
       setSaving(false);
@@ -110,12 +117,12 @@ export function useTaskMutations(
 
     try {
       setSaving(true);
-      // Send position updates sequentially to prevent race conditions
       for (const u of positionUpdates) {
         await api.updateTask({ id: u.id, position: u.position });
       }
       onBoardUpdate();
-    } catch {
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to reorder tasks');
       onBoardUpdate(); // revert on error
     } finally {
       setSaving(false);
@@ -127,8 +134,8 @@ export function useTaskMutations(
       setSaving(true);
       await api.createTask({ sprintId, title });
       onBoardUpdate();
-    } catch {
-      // Could add error toast here
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to create task');
     } finally {
       setSaving(false);
     }
@@ -147,7 +154,8 @@ export function useTaskMutations(
       setSaving(true);
       await api.updateTask(updates);
       onBoardUpdate();
-    } catch {
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to save task');
       onBoardUpdate();
     } finally {
       setSaving(false);
@@ -159,12 +167,13 @@ export function useTaskMutations(
       setSaving(true);
       await api.deleteTask(id);
       onBoardUpdate();
-    } catch {
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to delete task');
       onBoardUpdate();
     } finally {
       setSaving(false);
     }
   };
 
-  return { saving, moveTask, reorderTasks, createTask, saveTask, deleteTask };
+  return { saving, error, moveTask, reorderTasks, createTask, saveTask, deleteTask };
 }

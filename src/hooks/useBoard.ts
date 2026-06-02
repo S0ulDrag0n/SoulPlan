@@ -11,7 +11,10 @@ export function useBoard() {
 
   const reload = useCallback(async () => {
     try {
-      setLoading(true);
+      // Only show loading spinner on initial load (no boardState yet).
+      // Subsequent reloads after mutations use optimistic updates,
+      // so we silently refresh without the flash.
+      if (!boardState) setLoading(true);
       setError(null);
       const data = await fetchBoard();
       setBoardState(data);
@@ -20,9 +23,9 @@ export function useBoard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [boardState]);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => { reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { boardState, setBoardState, loading, error, reload };
 }

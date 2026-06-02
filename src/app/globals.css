@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f3f4f6;
   --foreground: #111827;
+}
+
+.dark {
+  --background: #111827;
+  --foreground: #f3f4f6;
 }
 
 body {
@@ -11,7 +18,12 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
 }
 
-/* Scrollbar styling for the canvas */
+/* Prevent flash of wrong theme on load */
+html.dark body {
+  background-color: #111827;
+}
+
+/* Scrollbar styling */
 .overflow-x-auto::-webkit-scrollbar {
   height: 8px;
 }
@@ -25,4 +37,15 @@ body {
 }
 .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
+}
+
+/* Dark mode scrollbar */
+.dark .overflow-x-auto::-webkit-scrollbar-track {
+  background: #374151;
+}
+.dark .overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #6b7280;
+}
+.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }

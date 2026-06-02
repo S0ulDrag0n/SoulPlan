@@ -1,109 +1,67 @@
-import type {
-  BoardState, CreateTaskInput, UpdateTaskInput,
-  CreateReleaseInput, UpdateReleaseInput,
-  CreateSprintInput, UpdateSprintInput,
-  Task, Dependency,
-} from '@/lib/types';
+import type { BoardState } from './types';
 
-const BASE = '/api';
+const API_BASE = '/api';
 
+// ─── Generic helpers ──────────────────────────────────────
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(error.error || `Request failed: ${res.status}`);
+    const text = await res.text();
+    throw new Error(`API error ${res.status}: ${text}`);
   }
+  // DELETE may return empty body
+  if (res.status === 204 || res.headers.get('content-length') === '0') return undefined as T;
   return res.json();
 }
 
-// ─── Board ─────────────────────────────────────────────────
-
-export function fetchBoard(): Promise<BoardState> {
-  return request<BoardState>('/board');
+// ─── Boards ───────────────────────────────────────────────
+export async function getBoard(id: string): Promise<BoardState> {
+  return request<BoardState>(`/boards/${id}/state`);
 }
 
 // ─── Releases ─────────────────────────────────────────────
-
-export function createRelease(input: CreateReleaseInput): Promise<unknown> {
-  return request('/releases', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+export async function createRelease(data: { boardId: string; name: string }) {
+  return request('/releases', { method: 'POST', body: JSON.stringify(data) });
 }
-
-export function updateRelease(id: string, input: Omit<UpdateReleaseInput, 'id'>): Promise<{ ok: boolean }> {
-  return request<{ ok: boolean }>(`/releases/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(input),
-  });
+export async function updateRelease(id: string, data: Record<string, unknown>) {
+  return request(`/releases/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 }
-
-export function deleteRelease(id: string): Promise<{ ok: boolean }> {
-  return request<{ ok: boolean }>(`/releases/${id}`, {
-    method: 'DELETE',
-  });
+export async function deleteRelease(id: string) {
+  return request(`/releases/${id}`, { method: 'DELETE' });
 }
 
 // ─── Sprints ──────────────────────────────────────────────
-
-export function createSprint(input: CreateSprintInput): Promise<unknown> {
-  return request('/sprints', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+export async function createSprint(data: { releaseId: string; name: string }) {
+  return request('/sprints', { method: 'POST', body: JSON.stringify(data) });
 }
-
-export function updateSprint(id: string, input: Omit<UpdateSprintInput, 'id'>): Promise<{ ok: boolean }> {
-  return request<{ ok: boolean }>(`/sprints/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(input),
-  });
+export async function updateSprint(id: string, data: Record<string, unknown>) {
+  return request(`/sprints/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 }
-
-export function deleteSprint(id: string): Promise<{ ok: boolean }> {
-  return request<{ ok: boolean }>(`/sprints/${id}`, {
-    method: 'DELETE',
-  });
+export async function deleteSprint(id: string) {
+  return request(`/sprints/${id}`, { method: 'DELETE' });
 }
 
 // ─── Tasks ────────────────────────────────────────────────
-
-export function createTask(input: CreateTaskInput): Promise<Task> {
-  return request<Task>('/tasks', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+export async function createTask(data: { sprintId: string; title: string; position?: number }) {
+  return request('/tasks', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function updateTask(id: string, data: Record<string, unknown>) {
+  return request(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+export async function deleteTask(id: string) {
+  return request(`/tasks/${id}`, { method: 'DELETE' });
 }
 
-export function updateTask(input: UpdateTaskInput): Promise<{ success: boolean }> {
-  return request<{ success: boolean }>('/tasks', {
-    method: 'PATCH',
-    body: JSON.stringify(input),
-  });
-}
-
-export function deleteTask(id: string): Promise<{ success: boolean }> {
-  return request<{ success: boolean }>('/tasks', {
-    method: 'DELETE',
-    body: JSON.stringify({ id }),
-  });
-}
-
-// ─── Dependencies ──────────────────────────────────────────
-
-export function createDependency(fromTaskId: string, toTaskId: string): Promise<Dependency> {
-  return request<Dependency>('/dependencies', {
+// ─── Dependencies ─────────────────────────────────────────
+export async function createDependency(fromTaskId: string, toTaskId: string) {
+  return request('/dependencies', {
     method: 'POST',
     body: JSON.stringify({ fromTaskId, toTaskId }),
   });
 }
-
-export function deleteDependency(id: string): Promise<{ success: boolean }> {
-  return request<{ success: boolean }>('/dependencies', {
-    method: 'DELETE',
-    body: JSON.stringify({ id }),
-  });
+export async function deleteDependency(id: string) {
+  return request(`/dependencies/${id}`, { method: 'DELETE' });
 }

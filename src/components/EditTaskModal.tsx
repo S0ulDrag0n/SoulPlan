@@ -16,6 +16,7 @@ export default function EditTaskModal({ task, boardState, onSave, onClose }: Edi
   const [depFromId, setDepFromId] = useState('');
   const [depToId, setDepToId] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Get all tasks across the board for dependency selection
   const allTasks = boardState.releases.flatMap(r => r.sprints.flatMap(s => s.tasks));
@@ -28,13 +29,14 @@ export default function EditTaskModal({ task, boardState, onSave, onClose }: Edi
   const handleAddDependency = async () => {
     if (!depToId) return;
     setSaving(true);
+    setError(null);
     try {
       await api.createDependency(task.id, depToId);
       setDepToId('');
       // Trigger board refresh via parent
       onSave(form);
-    } catch {
-      // Error handling could be improved
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add dependency');
     } finally {
       setSaving(false);
     }
@@ -43,12 +45,13 @@ export default function EditTaskModal({ task, boardState, onSave, onClose }: Edi
   const handleAddBlockedBy = async () => {
     if (!depFromId) return;
     setSaving(true);
+    setError(null);
     try {
       await api.createDependency(depFromId, task.id);
       setDepFromId('');
       onSave(form);
-    } catch {
-      // Error handling
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add blocked-by dependency');
     } finally {
       setSaving(false);
     }
@@ -56,11 +59,12 @@ export default function EditTaskModal({ task, boardState, onSave, onClose }: Edi
 
   const handleRemoveDependency = async (depId: string) => {
     setSaving(true);
+    setError(null);
     try {
       await api.deleteDependency(depId);
       onSave(form);
-    } catch {
-      // Error handling
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove dependency');
     } finally {
       setSaving(false);
     }
@@ -212,6 +216,9 @@ export default function EditTaskModal({ task, boardState, onSave, onClose }: Edi
             </div>
           </div>
         </div>
+        {error && (
+          <p className="text-sm text-red-600 mt-2">{error}</p>
+        )}
         <div className="flex gap-2 mt-4 justify-end">
           <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
           <button onClick={() => onSave(form)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>

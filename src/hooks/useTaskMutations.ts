@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import type { Task, UpdateTaskInput, BoardState } from '@/lib/types';
-import { moveTaskBetweenSprints, resolveDropTarget, findSprintIdForTask } from '@/lib/transform';
-import { arrayMove } from '@dnd-kit/sortable';
+import { moveTaskBetweenSprints, findSprintIdForTask } from '@/lib/transform';
 import * as api from '@/lib/api';
 
 export function useTaskMutations(
@@ -13,21 +12,63 @@ export function useTaskMutations(
 ) {
   const [saving, setSaving] = useState(false);
 
-  const moveTask = async (taskId: string, targetSprintId: string): Promise<void> => {
+  /**
+   * Move a task to a different sprint (or reorder within the same sprint).
+   * insertIndex: where to insert in the target sprint's task list.
+   *               -1 or omitted → append to end.
+   */
+  const moveTask = async (taskId: string, targetSprintId: string, insertIndex: number = -1): Promise<void> => {
     if (!boardState) return;
 
-    // Don't move if same sprint
     const sourceSprintId = findSprintIdForTask(boardState, taskId);
-    if (!sourceSprintId || sourceSprintId === targetSprintId) return;
+    if (!sourceSprintId) return;
 
     // Optimistic update — apply immediately so UI doesn't rubber-band
-    const optimisticState = moveTaskBetweenSprints(boardState, taskId, targetSprintId);
+    const optimisticState = moveTaskBetweenSprints(boardState, taskId, targetSprintId, insertIndex);
     setBoardState(optimisticState);
+
+    // Build position updates for all affected tasks
+    const targetSprint = optimisticState.releases
+      .flatMap(r => r.sprints)
+      .find(s => s.id === targetSprintId);
+
+    if (!targetSprint) { onBoardUpdate(); return; }
 
     try {
       setSaving(true);
-      await api.updateTask({ id: taskId, sprintId: targetSprintId });
-      onBoardUpdate(); // re-fetch to sync with server
+
+      // Update the moved task's sprintId + position
+      if (sourceSprintId !== targetSprintId) {
+        const movedTask = targetSprint.tasks.find(t => t.id === taskId);
+        await api.updateTask({
+          id: taskId,
+          sprintId: targetSprintId,
+          position: movedTask?.position ?? 0,
+        });
+      }
+
+      // Update positions for all tasks in target sprint
+      await Promise.all(
+        targetSprint.tasks.map(t =>
+          api.updateTask({ id: t.id, position: t.position })
+        )
+      );
+
+      // Re-index source sprint if cross-sprint move
+      if (sourceSprintId !== targetSprintId) {
+        const sourceSprint = optimisticState.releases
+          .flatMap(r => r.sprints)
+          .find(s => s.id === sourceSprintId);
+        if (sourceSprint) {
+          await Promise.all(
+            sourceSprint.tasks.map(t =>
+              api.updateTask({ id: t.id, position: t.position })
+            )
+          );
+        }
+      }
+
+      onBoardUpdate();
     } catch {
       onBoardUpdate(); // re-fetch on error to revert optimistic update
     } finally {
@@ -122,10 +163,5 @@ export function useTaskMutations(
     }
   };
 
-  const resolveDrop = (overId: string | number): string | undefined => {
-    if (!boardState) return undefined;
-    return resolveDropTarget(boardState, overId);
-  };
-
-  return { saving, moveTask, reorderTasks, createTask, saveTask, deleteTask, resolveDrop };
+  return { saving, moveTask, reorderTasks, createTask, saveTask, deleteTask };
 }

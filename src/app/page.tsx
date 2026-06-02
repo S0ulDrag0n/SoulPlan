@@ -8,6 +8,7 @@ import ReleaseBlock from '@/components/ReleaseBlock';
 import EditTaskModal from '@/components/EditTaskModal';
 import EditReleaseModal from '@/components/EditReleaseModal';
 import EditSprintModal from '@/components/EditSprintModal';
+import DependencyLines from '@/components/DependencyLines';
 import { useBoard } from '@/hooks/useBoard';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
 import { findTaskById, resolveDropTarget } from '@/lib/transform';
@@ -25,6 +26,9 @@ export default function Home() {
   // Ref to always-read-latest boardState in async DnD handlers
   const boardStateRef = useRef(boardState);
   boardStateRef.current = boardState;
+
+  // Ref for the scrollable board container (for dependency lines)
+  const boardContainerRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -80,6 +84,14 @@ export default function Home() {
     // Cross-sprint move — pass insertIndex so task lands at the right position
     await moveTask(taskId, targetSprintId, insertIndex);
   }, [moveTask, reorderTasks]);
+
+  // Re-draw dependency lines after drag operations settle
+  const handleDragEndAndRefresh = useCallback(async (event: DragEndEvent) => {
+    await handleDragEnd(event);
+    // Lines will update via ResizeObserver and boardState change,
+    // but add a small delay for DOM to settle after drag
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+  }, [handleDragEnd]);
 
   // ─── Jump to task (for dependency badges) ────────────────
 
@@ -188,9 +200,10 @@ export default function Home() {
       </header>
 
       {/* Board */}
-      <main className="p-6 overflow-x-auto">
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex gap-6 min-h-[400px]">
+      <main className="p-6 overflow-x-auto" ref={boardContainerRef}>
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEndAndRefresh}>
+          <div className="relative flex gap-6 min-h-[400px]">
+            <DependencyLines dependencies={allDependencies} containerRef={boardContainerRef} />
             {boardState.releases.map((release) => (
               <ReleaseBlock
                 key={release.id}

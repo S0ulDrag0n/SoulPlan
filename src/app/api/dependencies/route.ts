@@ -12,6 +12,11 @@ export async function POST(req: NextRequest) {
     if (fromTaskId === toTaskId) {
       return NextResponse.json({ error: 'Cannot create self-referencing dependency' }, { status: 400 });
     }
+    // Check for duplicate dependency
+    const existing = await q.findDependency(fromTaskId, toTaskId);
+    if (existing) {
+      return NextResponse.json({ error: 'Dependency already exists' }, { status: 409 });
+    }
     const dep = await q.createDependency(fromTaskId, toTaskId);
     return NextResponse.json(dep);
   } catch (error) {

@@ -91,7 +91,7 @@ export default function SortableTaskCard({
           Edit
         </button>
         <button
-          onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
+          onClick={(e) => { e.stopPropagation(); if (confirm('Delete this task?')) onDelete(task.id); }}
           className="text-xs text-gray-400 hover:text-red-500"
         >
           Delete

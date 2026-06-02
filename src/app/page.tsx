@@ -9,6 +9,7 @@ import EditTaskModal from '@/components/EditTaskModal';
 import EditReleaseModal from '@/components/EditReleaseModal';
 import EditSprintModal from '@/components/EditSprintModal';
 import DependencyLines from '@/components/DependencyLines';
+import { DependencyConnectorProvider } from '@/components/DependencyConnector';
 import PanCanvas from '@/components/PanCanvas';
 import ThemeToggle from '@/components/ThemeToggle';
 import { useBoard } from '@/hooks/useBoard';
@@ -94,6 +95,18 @@ export default function Home() {
     // but add a small delay for DOM to settle after drag
     setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
   }, [handleDragEnd]);
+
+  // ─── Dependency creation / deletion ────────────────────────
+
+  const handleCreateDependency = useCallback(async (fromTaskId: string, toTaskId: string) => {
+    await api.createDependency(fromTaskId, toTaskId);
+    reload();
+  }, [reload]);
+
+  const handleDeleteDependency = useCallback(async (depId: string) => {
+    await api.deleteDependency(depId);
+    reload();
+  }, [reload]);
 
   // ─── Jump to task (for dependency badges) ────────────────
 
@@ -202,37 +215,47 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Board — Miro-style pannable canvas */}
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEndAndRefresh}>
-        <PanCanvas className="flex-1">
-          <div ref={boardContainerRef} className="relative p-8">
-            <div className="relative flex gap-6 min-h-[400px]">
-              <DependencyLines dependencies={allDependencies} containerRef={boardContainerRef} />
-              {boardState.releases.map((release) => (
-                <ReleaseBlock
-                  key={release.id}
-                  release={release}
-                  onAddSprint={handleAddSprint}
-                  onEditRelease={setEditingRelease}
-                  onDeleteRelease={handleDeleteRelease}
-                  onAddTask={handleAddTask}
-                  onEditTask={setEditingTask}
-                  onDeleteTask={handleDeleteTask}
-                  onEditSprint={setEditingSprint}
-                  onDeleteSprint={handleDeleteSprint}
+      {/* Board — Miro-style pannable canvas with dependency connector */}
+      <DependencyConnectorProvider
+        dependencies={allDependencies}
+        onCreateDependency={handleCreateDependency}
+        containerRef={boardContainerRef}
+      >
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEndAndRefresh}>
+          <PanCanvas className="flex-1">
+            <div ref={boardContainerRef} className="relative p-8">
+              <div className="relative flex gap-6 min-h-[400px]">
+                <DependencyLines
                   dependencies={allDependencies}
-                  onJumpToTask={handleJumpToTask}
+                  containerRef={boardContainerRef}
+                  onDeleteDependency={handleDeleteDependency}
                 />
-              ))}
+                {boardState.releases.map((release) => (
+                  <ReleaseBlock
+                    key={release.id}
+                    release={release}
+                    onAddSprint={handleAddSprint}
+                    onEditRelease={setEditingRelease}
+                    onDeleteRelease={handleDeleteRelease}
+                    onAddTask={handleAddTask}
+                    onEditTask={setEditingTask}
+                    onDeleteTask={handleDeleteTask}
+                    onEditSprint={setEditingSprint}
+                    onDeleteSprint={handleDeleteSprint}
+                    dependencies={allDependencies}
+                    onJumpToTask={handleJumpToTask}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        </PanCanvas>
+          </PanCanvas>
 
-        {/* DragOverlay outside PanCanvas so it's not affected by pan transform */}
-        <DragOverlay>
-          {activeTask ? <DragOverlayTask task={activeTask} /> : null}
-        </DragOverlay>
-      </DndContext>
+          {/* DragOverlay outside PanCanvas so it's not affected by pan transform */}
+          <DragOverlay>
+            {activeTask ? <DragOverlayTask task={activeTask} /> : null}
+          </DragOverlay>
+        </DndContext>
+      </DependencyConnectorProvider>
 
       {/* Modals */}
       {editingTask && (

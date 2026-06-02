@@ -10,7 +10,7 @@ import EditReleaseModal from '@/components/EditReleaseModal';
 import EditSprintModal from '@/components/EditSprintModal';
 import { useBoard } from '@/hooks/useBoard';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
-import { moveTaskBetweenSprints, findTaskById, resolveDropTarget } from '@/lib/transform';
+import { findTaskById, resolveDropTarget } from '@/lib/transform';
 import type { Task, Release, Sprint } from '@/lib/types';
 import * as api from '@/lib/api';
 
@@ -41,14 +41,15 @@ export default function Home() {
 
     const taskId = String(active.id);
 
-    // Find which sprint the over target belongs to
-    const targetSprintId = resolveDropTarget(boardState, over.id);
-    if (!targetSprintId) return;
+    // resolveDropTarget returns { sprintId, insertIndex }
+    const drop = resolveDropTarget(boardState, over.id);
+    if (!drop) return;
 
+    const { sprintId: targetSprintId, insertIndex } = drop;
     const activeSprintId = findTaskById(boardState, taskId)?.sprintId;
 
     if (activeSprintId === targetSprintId) {
-      // Same sprint — reorder
+      // Same sprint — reorder within
       const sprint = boardState.releases
         .flatMap(r => r.sprints)
         .find(s => s.id === targetSprintId);
@@ -57,22 +58,11 @@ export default function Home() {
       const oldIndex = sprint.tasks.findIndex(t => t.id === taskId);
       if (oldIndex === -1) return;
 
-      const overId = String(over.id);
-      const newIndex = sprint.tasks.findIndex(t => t.id === overId);
+      // If dropped on same position, no-op
+      if (oldIndex === insertIndex || (insertIndex === sprint.tasks.length && oldIndex === sprint.tasks.length - 1)) return;
 
-      if (newIndex === -1) {
-        // Dropped on the sprint column itself — move to end
-        const positionUpdates = sprint.tasks
-          .filter(t => t.id !== taskId)
-          .map((t, i) => ({ id: t.id, position: i }));
-        positionUpdates.push({ id: taskId, position: sprint.tasks.length - 1 });
-        await reorderTasks(positionUpdates, targetSprintId);
-        return;
-      }
-
-      if (oldIndex === newIndex) return;
-
-      const reordered = arrayMove(sprint.tasks, oldIndex, newIndex);
+      // Use arrayMove for same-sprint reorder
+      const reordered = arrayMove(sprint.tasks, oldIndex, insertIndex);
       const positionUpdates = reordered.map((t, i) => ({
         id: t.id,
         position: i,
@@ -81,8 +71,8 @@ export default function Home() {
       return;
     }
 
-    // Move between sprints
-    await moveTask(taskId, targetSprintId);
+    // Cross-sprint move — pass insertIndex so task lands at the right position
+    await moveTask(taskId, targetSprintId, insertIndex);
   }, [boardState, moveTask, reorderTasks]);
 
   // ─── Jump to task (for dependency badges) ────────────────

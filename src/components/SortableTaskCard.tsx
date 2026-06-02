@@ -42,6 +42,7 @@ export default function SortableTaskCard({
   return (
     <div
       ref={setNodeRef}
+      data-task-id={task.id}
       style={style}
       {...attributes}
       {...listeners}

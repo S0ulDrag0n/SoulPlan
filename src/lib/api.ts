@@ -34,15 +34,15 @@ export function createRelease(input: CreateReleaseInput): Promise<unknown> {
   });
 }
 
-export function updateRelease(id: string, input: Omit<UpdateReleaseInput, 'id'>): Promise<{ ok: boolean }> {
-  return request<{ ok: boolean }>(`/releases/${id}`, {
+export function updateRelease(id: string, input: Omit<UpdateReleaseInput, 'id'>): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/releases/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(input),
   });
 }
 
-export function deleteRelease(id: string): Promise<{ ok: boolean }> {
-  return request<{ ok: boolean }>(`/releases/${id}`, {
+export function deleteRelease(id: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/releases/${id}`, {
     method: 'DELETE',
   });
 }
@@ -56,15 +56,15 @@ export function createSprint(input: CreateSprintInput): Promise<unknown> {
   });
 }
 
-export function updateSprint(id: string, input: Omit<UpdateSprintInput, 'id'>): Promise<{ ok: boolean }> {
-  return request<{ ok: boolean }>(`/sprints/${id}`, {
+export function updateSprint(id: string, input: Omit<UpdateSprintInput, 'id'>): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/sprints/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(input),
   });
 }
 
-export function deleteSprint(id: string): Promise<{ ok: boolean }> {
-  return request<{ ok: boolean }>(`/sprints/${id}`, {
+export function deleteSprint(id: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/sprints/${id}`, {
     method: 'DELETE',
   });
 }

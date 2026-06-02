@@ -9,6 +9,7 @@ import EditTaskModal from '@/components/EditTaskModal';
 import EditReleaseModal from '@/components/EditReleaseModal';
 import EditSprintModal from '@/components/EditSprintModal';
 import DependencyLines from '@/components/DependencyLines';
+import PanCanvas from '@/components/PanCanvas';
 import { useBoard } from '@/hooks/useBoard';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
 import { findTaskById, resolveDropTarget } from '@/lib/transform';
@@ -27,7 +28,7 @@ export default function Home() {
   const boardStateRef = useRef(boardState);
   boardStateRef.current = boardState;
 
-  // Ref for the scrollable board container (for dependency lines)
+  // Ref for the board container (for dependency lines)
   const boardContainerRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
@@ -178,7 +179,7 @@ export default function Home() {
   const allDependencies = boardState.dependencies;
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="h-screen flex flex-col bg-gray-100">
       {/* Mutation error toast */}
       {mutationError && (
         <div className="fixed top-4 right-4 z-50 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium animate-pulse">
@@ -186,7 +187,7 @@ export default function Home() {
         </div>
       )}
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0">
         <h1 className="text-2xl font-bold text-gray-800">{boardState.board.name}</h1>
         <div className="flex items-center gap-3">
           {saving && <span className="text-sm text-gray-400">Saving...</span>}
@@ -199,33 +200,35 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Board */}
-      <main className="p-6 overflow-x-auto" ref={boardContainerRef}>
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEndAndRefresh}>
-          <div className="relative flex gap-6 min-h-[400px]">
-            <DependencyLines dependencies={allDependencies} containerRef={boardContainerRef} />
-            {boardState.releases.map((release) => (
-              <ReleaseBlock
-                key={release.id}
-                release={release}
-                onAddSprint={handleAddSprint}
-                onEditRelease={setEditingRelease}
-                onDeleteRelease={handleDeleteRelease}
-                onAddTask={handleAddTask}
-                onEditTask={setEditingTask}
-                onDeleteTask={handleDeleteTask}
-                onEditSprint={setEditingSprint}
-                onDeleteSprint={handleDeleteSprint}
-                dependencies={allDependencies}
-                onJumpToTask={handleJumpToTask}
-              />
-            ))}
-          </div>
-          <DragOverlay>
-            {activeTask ? <DragOverlayTask task={activeTask} /> : null}
-          </DragOverlay>
-        </DndContext>
-      </main>
+      {/* Board — Miro-style pannable canvas */}
+      <PanCanvas className="flex-1">
+        <div ref={boardContainerRef} className="relative p-8">
+          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEndAndRefresh}>
+            <div className="relative flex gap-6 min-h-[400px]">
+              <DependencyLines dependencies={allDependencies} containerRef={boardContainerRef} />
+              {boardState.releases.map((release) => (
+                <ReleaseBlock
+                  key={release.id}
+                  release={release}
+                  onAddSprint={handleAddSprint}
+                  onEditRelease={setEditingRelease}
+                  onDeleteRelease={handleDeleteRelease}
+                  onAddTask={handleAddTask}
+                  onEditTask={setEditingTask}
+                  onDeleteTask={handleDeleteTask}
+                  onEditSprint={setEditingSprint}
+                  onDeleteSprint={handleDeleteSprint}
+                  dependencies={allDependencies}
+                  onJumpToTask={handleJumpToTask}
+                />
+              ))}
+            </div>
+            <DragOverlay>
+              {activeTask ? <DragOverlayTask task={activeTask} /> : null}
+            </DragOverlay>
+          </DndContext>
+        </div>
+      </PanCanvas>
 
       {/* Modals */}
       {editingTask && (
@@ -247,7 +250,7 @@ export default function Home() {
         <EditSprintModal
           sprint={editingSprint}
           onSave={handleEditSprint}
-          onClose={() =>setEditingSprint(null)}
+          onClose={() => setEditingSprint(null)}
         />
       )}
     </div>

@@ -1,10 +1,10 @@
 'use client';
 
 import SprintColumn from './SprintColumn';
-import type { Dependency, Release } from '@/lib/types';
+import type { Dependency, Release, ReleaseWithSprints } from '@/lib/types';
 
 interface ReleaseBlockProps {
-  release: Release;
+  release: ReleaseWithSprints;
   onAddSprint: (releaseId: string) => void;
   onEditRelease: (release: Release) => void;
   onDeleteRelease: (id: string) => void;

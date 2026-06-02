@@ -1,8 +1,10 @@
 'use client';
 
+import { useRef, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Dependency, Task } from '@/lib/types';
+import { useDependencyConnector } from './DependencyConnector';
 
 interface SortableTaskCardProps {
   task: Task;
@@ -32,6 +34,13 @@ export default function SortableTaskCard({
     isDragging,
   } = useSortable({ id: task.id, data: { type: 'task', task } });
 
+  // Dependency connector context
+  const { connectionMode, hoveredTaskId, startConnection } = useDependencyConnector();
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Is this card the current valid drop target for a dependency connection?
+  const isDropTarget = connectionMode && hoveredTaskId === task.id;
+
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition: isDragging ? 'none' : transition,
@@ -39,14 +48,28 @@ export default function SortableTaskCard({
     borderLeft: `4px solid ${task.color}`,
   };
 
+  const handleConnectorPointerDown = useCallback((e: React.PointerEvent) => {
+    // Stop dnd-kit from picking this up as a drag start
+    e.stopPropagation();
+    e.preventDefault();
+    if (cardRef.current) {
+      startConnection(task.id, cardRef.current);
+    }
+  }, [task.id, startConnection]);
+
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node);
+        (cardRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+      }}
       data-task-id={task.id}
       style={style}
       {...attributes}
       {...listeners}
-      className="bg-white dark:bg-gray-800 rounded-lg shadow-sm dark:shadow-gray-900/30 p-3 mb-2 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow"
+      className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-sm dark:shadow-gray-900/30 p-3 mb-2 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow${
+        isDropTarget ? ' ring-2 ring-green-400 dark:ring-green-500 ring-offset-1' : ''
+      }`}
     >
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-gray-800 dark:text-gray-100 flex-1">{task.title}</span>
@@ -84,18 +107,31 @@ export default function SortableTaskCard({
         </div>
       )}
 
-      <div className="flex gap-1 mt-2">
+      {/* Bottom row: action buttons + connector handle */}
+      <div className="flex items-center justify-between mt-2">
+        <div className="flex gap-1">
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(task); }}
+            className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400"
+          >
+            Edit
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); if (confirm('Delete this task?')) onDelete(task.id); }}
+            className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400"
+          >
+            Delete
+          </button>
+        </div>
+
+        {/* Dependency connector handle — drag from here to another task to create a dependency */}
         <button
-          onClick={(e) => { e.stopPropagation(); onEdit(task); }}
-          className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400"
+          onPointerDown={handleConnectorPointerDown}
+          onClick={(e) => e.stopPropagation()}
+          className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors cursor-crosshair"
+          title="Drag to another task to create a dependency (this task blocks the target)"
         >
-          Edit
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); if (confirm('Delete this task?')) onDelete(task.id); }}
-          className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400"
-        >
-          Delete
+          🔗
         </button>
       </div>
     </div>

@@ -3,10 +3,10 @@
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import SortableTaskCard from './SortableTaskCard';
-import type { Dependency, Sprint, Task } from '@/lib/types';
+import type { Dependency, Sprint, SprintWithTasks, Task } from '@/lib/types';
 
 interface SprintColumnProps {
-  sprint: Sprint;
+  sprint: SprintWithTasks;
   tasks: Task[];
   dependencies: Dependency[];
   onAddTask: (sprintId: string) => void;
@@ -34,6 +34,7 @@ export default function SprintColumn({
   return (
     <div
       ref={setNodeRef}
+      data-sprint-id={sprint.id}
       className={`min-w-[220px] max-w-[280px] flex flex-col rounded-xl border-2 transition-colors ${
         isOver
           ? 'border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/30'

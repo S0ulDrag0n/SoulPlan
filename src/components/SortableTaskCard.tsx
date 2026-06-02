@@ -34,11 +34,9 @@ export default function SortableTaskCard({
     isDragging,
   } = useSortable({ id: task.id, data: { type: 'task', task } });
 
-  // Dependency connector context
   const { connectionMode, hoveredTaskId, startConnection } = useDependencyConnector();
-  const cardRef = useRef<HTMLDivElement>(null);
+  const connectorRef = useRef<HTMLButtonElement>(null);
 
-  // Is this card the current valid drop target for a dependency connection?
   const isDropTarget = connectionMode && hoveredTaskId === task.id;
 
   const style: React.CSSProperties = {
@@ -49,20 +47,16 @@ export default function SortableTaskCard({
   };
 
   const handleConnectorPointerDown = useCallback((e: React.PointerEvent) => {
-    // Stop dnd-kit from picking this up as a drag start
     e.stopPropagation();
     e.preventDefault();
-    if (cardRef.current) {
-      startConnection(task.id, cardRef.current);
+    if (connectorRef.current) {
+      startConnection(task.id, connectorRef.current);
     }
   }, [task.id, startConnection]);
 
   return (
     <div
-      ref={(node) => {
-        setNodeRef(node);
-        (cardRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
-      }}
+      ref={setNodeRef}
       data-task-id={task.id}
       style={style}
       className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-sm dark:shadow-gray-900/30 p-3 mb-2 hover:shadow-md transition-shadow${
@@ -129,6 +123,7 @@ export default function SortableTaskCard({
 
         {/* Dependency connector handle — drag from here to another task to create a dependency */}
         <button
+          ref={connectorRef}
           onPointerDown={handleConnectorPointerDown}
           onClick={(e) => e.stopPropagation()}
           className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors cursor-crosshair"

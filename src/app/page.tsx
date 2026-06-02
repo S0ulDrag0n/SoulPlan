@@ -37,16 +37,19 @@ export default function Home() {
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     setActiveTask(null);
     const { active, over } = event;
+    console.log('[DnD] active.id:', active?.id, 'over?.id:', over?.id, 'over:', over);
     if (!over || !boardState) return;
 
     const taskId = String(active.id);
 
     // resolveDropTarget returns { sprintId, insertIndex }
     const drop = resolveDropTarget(boardState, over.id);
+    console.log('[DnD] taskId:', taskId, 'drop:', drop);
     if (!drop) return;
 
     const { sprintId: targetSprintId, insertIndex } = drop;
     const activeSprintId = findTaskById(boardState, taskId)?.sprintId;
+    console.log('[DnD] activeSprintId:', activeSprintId, 'targetSprintId:', targetSprintId, 'insertIndex:', insertIndex);
 
     if (activeSprintId === targetSprintId) {
       // Same sprint — reorder within
@@ -72,6 +75,7 @@ export default function Home() {
     }
 
     // Cross-sprint move — pass insertIndex so task lands at the right position
+    console.log('[DnD] Calling moveTask:', taskId, targetSprintId, insertIndex);
     await moveTask(taskId, targetSprintId, insertIndex);
   }, [boardState, moveTask, reorderTasks]);
 

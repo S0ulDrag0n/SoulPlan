@@ -43,4 +43,5 @@ export interface IDatabase {
   createDependency(id: string, fromTaskId: string, toTaskId: string): Promise<DependencyRow>;
   deleteDependency(id: string): Promise<void>;
   deleteDependenciesByTaskId(taskId: string): Promise<void>;
+  findDependency(fromTaskId: string, toTaskId: string): Promise<DependencyRow | undefined>;
 }

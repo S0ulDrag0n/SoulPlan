@@ -203,9 +203,9 @@ export function DependencyConnectorProvider({
           {/* Source dot */}
           <circle cx={tempLine.x1} cy={tempLine.y1} r="5" fill="#3b82f6" opacity="0.9" />
           {/* Target dot when hovering a card */}
-          {hoveredTaskId && (
+          {hoveredTaskId ? (
             <circle cx={tempLine.x2} cy={tempLine.y2} r="5" fill="#10b981" opacity="0.9" />
-          />
+          ) : null}
         </svg>
       )}
 

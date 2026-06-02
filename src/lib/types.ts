@@ -61,6 +61,16 @@ export interface BoardState {
   dependencies: Dependency[];
 }
 
+/** Release with nested sprints & tasks — as used in BoardState */
+export type ReleaseWithSprints = Release & {
+  sprints: SprintWithTasks[];
+};
+
+/** Sprint with nested tasks — as used in BoardState */
+export type SprintWithTasks = Sprint & {
+  tasks: Task[];
+};
+
 /** Input shape for creating a task */
 export interface CreateTaskInput {
   sprintId: string;

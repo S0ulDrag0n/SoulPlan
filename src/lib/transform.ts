@@ -3,6 +3,7 @@ import type {
 } from './db/types';
 import type {
   Board, Release, Sprint, Task, Dependency, BoardState,
+  SprintWithTasks,
 } from './types';
 
 // ─── Row → Model transforms (pure functions) ────────────────
@@ -203,7 +204,7 @@ export function findTaskById(state: BoardState, taskId: string): Task | undefine
   return undefined;
 }
 
-export function findSprintById(state: BoardState, sprintId: string): Sprint | undefined {
+export function findSprintById(state: BoardState, sprintId: string): SprintWithTasks | undefined {
   for (const release of state.releases) {
     for (const sprint of release.sprints) {
       if (sprint.id === sprintId) return sprint;

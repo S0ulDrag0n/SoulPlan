@@ -200,10 +200,10 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Board — Miro-style pannable canvas */}
-      <PanCanvas className="flex-1">
-        <div ref={boardContainerRef} className="relative p-8">
-          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEndAndRefresh}>
+      {/* Board — DndContext wraps PanCanvas so DragOverlay renders at viewport coords */}
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEndAndRefresh}>
+        <PanCanvas className="flex-1">
+          <div ref={boardContainerRef} className="relative p-8">
             <div className="relative flex gap-6 min-h-[400px]">
               <DependencyLines dependencies={allDependencies} containerRef={boardContainerRef} />
               {boardState.releases.map((release) => (
@@ -223,12 +223,14 @@ export default function Home() {
                 />
               ))}
             </div>
-            <DragOverlay>
-              {activeTask ? <DragOverlayTask task={activeTask} /> : null}
-            </DragOverlay>
-          </DndContext>
-        </div>
-      </PanCanvas>
+          </div>
+        </PanCanvas>
+
+        {/* DragOverlay outside PanCanvas so it's not affected by pan transform */}
+        <DragOverlay>
+          {activeTask ? <DragOverlayTask task={activeTask} /> : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* Modals */}
       {editingTask && (

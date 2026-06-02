@@ -174,8 +174,8 @@ export default function DependencyLines({ dependencies, containerRef, onDeleteDe
         const tipY = line.y2;
         const base1X = tipX - arrowSize * Math.cos(angle - spread);
         const base1Y = tipY - arrowSize * Math.sin(angle - spread);
-        const base2X = tipX - arrowSize * Math.cos(angle + arrowSize);
-        const base2Y = tipY - arrowSize * Math.sin(angle + arrowSize);
+        const base2X = tipX - arrowSize * Math.cos(angle + spread);
+        const base2Y = tipY - arrowSize * Math.sin(angle + spread);
 
         const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
         arrow.setAttribute('class', 'dep-arrow');

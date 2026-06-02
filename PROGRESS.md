@@ -1,4 +1,4 @@
-# SoulPlan Progress — latest (master)
+# SoulPlan Progress — commit 85bbfe3 (master)
 
 ## Completed
 
@@ -29,7 +29,7 @@
 - Source card hidden during drag (opacity: 0), CSS transition disabled during drag (transition: none)
 - `SprintColumn`: wraps tasks in `SortableContext` with `verticalListSortingStrategy`, `useDroppable` for drop target
 - `page.tsx`: `DndContext` with `PointerSensor` (5px distance activation), `handleDragStart` sets overlay task, `handleDragEnd` dispatches reorder vs cross-sprint move
-- `useTaskMutations`: added `reorderTasks()` — sends sequential `PATCH /tasks` with updated `position` for each moved task
+- `useTaskMutations`: added `reorderTasks()` — sends parallel `PATCH /tasks` with updated `position` for each moved task
 
 ### Cross-Sprint Drag & Drop (Position-Aware)
 - `resolveDropTarget()` in transform.ts: returns `{ sprintId, insertIndex }` — drops on task → insert before it, drops on sprint column → append to end
@@ -49,9 +49,20 @@
   - Real-time add/remove with board refresh after each mutation
   - Task titles shown in chips; dropdown shows all other tasks across the board
 
+### SVG Dependency Lines
+- **DependencyLines component**: SVG overlay positioned absolutely over the board scroll container
+- Uses `data-task-id` attributes on task cards to locate DOM elements
+- Calculates line endpoints from right edge of "from" card to left edge of "to" card
+- Draws cubic Bézier curves with horizontal entry/exit, small arrowheads pointing right at target
+- Lines are dashed (`stroke-dasharray: 6 3`), semi-transparent, slate gray (`#94a3b8`)
+- Updates on: scroll, resize, board state changes (ResizeObserver), and after drag operations
+- `pointer-events: none` — lines don't interfere with drag-and-drop or clicks
+- `z-index: 1` — lines render below drag overlay but above sprint columns
+
 ### Toast Notifications
 - Success/error toast on task CRUD operations
-- Toast auto-dismisses; re-fetch on error to revert optimistic updates
+- Mutation error toast at top-right of page with auto-dismiss
+- Inline error feedback in EditTaskModal for dependency add failures
 
 ### Empty States
 - Empty sprint columns show helpful placeholder text
@@ -59,24 +70,29 @@
 ### "+ Task" Button
 - Fixed position in sprint header, doesn't shift when tasks are added
 
+### Tech Debt Fixes (Sprint 3)
+- **Dead code removed**: Deleted unused `TaskCard.tsx` (was not imported anywhere)
+- **Falsy-zero bug fixed**: `EditSprintModal` — `capacity || undefined` → `capacity || 0` (zero capacity now persists correctly)
+- **Duplicate dependency prevention**: UNIQUE DB index via `migrateV3()`, 409 API response on duplicate, `findDependency()` query
+- **Duplicate `boardStateRef` removed**: `useTaskMutations` now receives `boardStateRef` as parameter from `page.tsx` (single source of truth)
+- **Silent errors → visible feedback**: `useTaskMutations` exposes `error` state, `page.tsx` shows transient error toast, `EditTaskModal` shows inline error text
+- **API response normalization**: All endpoints now consistently return `{ success: boolean }` (was mixed `{ ok }` / `{ success }`)
+- **Loading flash fix**: `useBoard` only shows spinner on initial load, not on background re-fetches
+
 ## Remaining Work
 
 ### Low Priority Polish
 - **Horizontal scroll for overflowed dependency tags** — minor cosmetic when many deps on one task
 
-### Fixed Architecture Debt
-- **API race condition** — replaced `Promise.all` with sequential `for...of await` in `moveTask` and `reorderTasks`. PATCH calls now execute in order, preventing position clobbering under rapid use.
-- **Stale `boardState` closure** — both `page.tsx` and `useTaskMutations.ts` now use `useRef(boardState)` with `boardStateRef.current = boardState` on every render. Async DnD handlers always read the latest state, preventing stale state on rapid drags.
-- **No-op ternary** — cleaned `insertIndex > oldIndex ? insertIndex : insertIndex` to just `insertIndex` with a comment explaining `arrayMove` semantics.
-
-### Low Priority Polish
-- **Zoom & Pan** — not needed until 10+ sprints. `@dnd-kit` v6+ handles zoomed containers natively, no architecture shift required.
-- **SVG dependency lines** — badges give 80% value with 20% effort. SVG lines are polish for later (6-10h estimated).
+### Deferred (Not Needed Yet)
+- **Zoom & Pan** — not needed until 10+ sprints. dnd-kit v6+ handles zoomed containers natively, but CSS transforms interfere with collision detection. Will add when the board scales up.
+- **SVG dependency lines for same-sprint deps** — currently lines go left-to-right across sprint columns. Within the same sprint, lines would need to curve around. The badge UX handles this well enough.
 
 ## Architecture Notes
 - sql.js in-memory DB, persisted to `data/soul-plan.db` via `saveToDisk()`
-- `getDb()` is module-scoped async singleton — may reset on Turbopack hot reload (known dev-mode issue)
-- Frontend hooks: `useBoard()` (fetch + reload), `useTaskMutations()` (optimistic moves, CRUD, reorder)
+- `getDb()` is module-scoped async singleton with `migrateV3()` for UNIQUE dep index — may reset on Turbopack hot reload (known dev-mode issue)
+- Frontend hooks: `useBoard()` (fetch + reload, no flash on re-fetch), `useTaskMutations()` (optimistic moves, CRUD, reorder, error state)
 - All DB mutations call `saveToDisk()` after write
-- DnD: `DndContext` wraps board, `SortableContext` per sprint column, `useSortable` per task card, `useDroppable` per sprint column for cross-sprint drops
+- DnD: `DndContext` wraps board, `SortableContext` per sprint column, `useSortable` per task card (with `data-task-id` for SVG lines), `useDroppable` per sprint column
+- Dependency lines: `DependencyLines` SVG overlay in `page.tsx`, positioned absolutely inside the board's `relative flex` container
 - **Important**: Must push via `mcp_github_create_or_update_file` — NOT `mcp_github_push_files` (corrupts JSX/TSX). Local repo is root-owned, cannot run `tsc`/`next build`.

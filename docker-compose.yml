@@ -1,0 +1,10 @@
+services:
+  soulplan:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - soulplan-data:/app/data
+
+volumes:
+  soulplan-data:

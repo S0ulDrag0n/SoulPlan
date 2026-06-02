@@ -24,5 +24,5 @@ export function useBoard() {
 
   useEffect(() => { reload(); }, [reload]);
 
-  return { boardState, loading, error, reload };
+  return { boardState, setBoardState, loading, error, reload };
 }

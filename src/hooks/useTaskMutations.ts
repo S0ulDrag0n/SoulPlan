@@ -1,104 +1,96 @@
 'use client';
 
-import { useState } from 'react';
-import type { Task, UpdateTaskInput, BoardState } from '@/lib/types';
-import { moveTaskBetweenSprints, resolveDropTarget, findSprintIdForTask } from '@/lib/transform';
+import { useCallback } from 'react';
+import type { BoardState } from '@/lib/types';
 import * as api from '@/lib/api';
 
-export function useTaskMutations(
-  boardState: BoardState | null,
-  onBoardUpdate: () => void
-) {
+export function useTaskMutations(boardState: BoardState | null, onBoardUpdate: () => void) {
+  const moveTask = useCallback(async (taskId: string, targetSprintId: string) => {
+    // Optimistic update
+    if (boardState) {
+      const task = findTaskById(boardState, taskId);
+      if (task) {
+        const updates = { sprintId: targetSprintId, position: task.position };
+        await api.updateTask(taskId, updates);
+        onBoardUpdate();
+      }
+    }
+  }, [boardState, onBoardUpdate]);
+
+  const createTask = useCallback(async (sprintId: string, title: string) => {
+    await api.createTask({ sprintId, title, position: 0 });
+    onBoardUpdate();
+  }, [onBoardUpdate]);
+
+  const saveTask = useCallback(async (task: Parameters<typeof api.updateTask>[1]) => {
+    await updateTask(task.id, task);
+    onBoardUpdate();
+  }, [onBoardUpdate]);
+
+  const deleteTask = useCallback(async (id: string) => {
+    await api.deleteTask(id);
+    onBoardUpdate();
+  }, [onBoardUpdate]);
+
+  const reorderTasks = useCallback(async (positionUpdates: Array<{ id: string; position: number }>) => {
+    await Promise.all(
+      positionUpdates.map(({ id, position }) => api.updateTask(id, { position }))
+    );
+    onBoardUpdate();
+  }, [onBoardUpdate]);
+
+  // Simple saving state — true when any mutation is in flight
+  // For a more robust version, track a counter or use react-query
   const [saving, setSaving] = useState(false);
 
-  const moveTask = async (taskId: string, targetSprintId: string): Promise<BoardState | null> => {
-    if (!boardState) return null;
+  const wrappedMoveTask = useCallback(async (taskId: string, targetSprintId: string) => {
+    setSaving(true);
+    try { await moveTask(taskId, targetSprintId); }
+    finally { setSaving(false); }
+  }, [moveTask]);
 
-    // Don't move if same sprint
-    const sourceSprintId = findSprintIdForTask(boardState, taskId);
-    if (!sourceSprintId || sourceSprintId === targetSprintId) return null;
+  const wrappedCreateTask = useCallback(async (sprintId: string, title: string) => {
+    setSaving(true);
+    try { await createTask(sprintId, title); }
+    finally { setSaving(false); }
+  }, [createTask]);
 
-    // Optimistic update
-    const optimisticState = moveTaskBetweenSprints(boardState, taskId, targetSprintId);
+  const wrappedSaveTask = useCallback(async (task: any) => {
+    setSaving(true);
+    try { await saveTask(task); }
+    finally { setSaving(false); }
+  }, [saveTask]);
 
-    try {
-      setSaving(true);
-      await api.updateTask({ id: taskId, sprintId: targetSprintId });
-      onBoardUpdate(); // re-fetch to sync
-    } catch {
-      onBoardUpdate(); // re-fetch on error to revert optimistic update
-    } finally {
-      setSaving(false);
+  const wrappedDeleteTask = useCallback(async (id: string) => {
+    setSaving(true);
+    try { await deleteTask(id); }
+    finally { setSaving(false); }
+  }, [deleteTask]);
+
+  const wrappedReorderTasks = useCallback(async (positionUpdates: Array<{ id: string; position: number }>) => {
+    setSaving(true);
+    try { await reorderTasks(positionUpdates); }
+    finally { setSaving(false); }
+  }, [reorderTasks]);
+
+  return {
+    saving,
+    moveTask: wrappedMoveTask,
+    createTask: wrappedCreateTask,
+    saveTask: wrappedSaveTask,
+    deleteTask: wrappedDeleteTask,
+    reorderTasks: wrappedReorderTasks,
+  };
+}
+
+import { useState } from 'react';
+
+function findTaskById(boardState: BoardState, taskId: string) {
+  for (const release of boardState.releases) {
+    for (const sprint of release.sprints) {
+      const task = sprint.tasks.find(t => t.id === taskId);
+      if (task) return task;
     }
-
-    return optimisticState;
-  };
-
-  /** Reorder tasks within a sprint by sending position updates */
-  const reorderTasks = async (positionUpdates: { id: string; position: number }[]) => {
-    if (!boardState) return;
-    try {
-      setSaving(true);
-      // Send all position updates in parallel
-      await Promise.all(
-        positionUpdates.map(u => api.updateTask({ id: u.id, position: u.position }))
-      );
-      onBoardUpdate();
-    } catch {
-      onBoardUpdate();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const createTask = async (sprintId: string, title: string) => {
-    try {
-      setSaving(true);
-      await api.createTask({ sprintId, title });
-      onBoardUpdate();
-    } catch {
-      // Could add error toast here
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const saveTask = async (task: Task) => {
-    const updates: UpdateTaskInput = {
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      estimate: task.estimate,
-      color: task.color,
-      isCritical: task.isCritical,
-    };
-    try {
-      setSaving(true);
-      await api.updateTask(updates);
-      onBoardUpdate();
-    } catch {
-      onBoardUpdate();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const deleteTask = async (id: string) => {
-    try {
-      setSaving(true);
-      await api.deleteTask(id);
-      onBoardUpdate();
-    } catch {
-      onBoardUpdate();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const resolveDrop = (overId: string | number): string | undefined => {
-    if (!boardState) return undefined;
-    return resolveDropTarget(boardState, overId);
-  };
-
-  return { saving, moveTask, reorderTasks, createTask, saveTask, deleteTask, resolveDrop };
+  }
+  return undefined;
 }

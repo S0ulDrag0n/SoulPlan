@@ -46,13 +46,11 @@ export default function SprintColumn({
             {usedCapacity}/{sprint.capacity}{sprint.capacityUnit}
           </span>
         </div>
-        {(dateRange || sprint.notes) && (
-          <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
-            {dateRange && <span>{dateRange}</span>}
-            {sprint.notes && (
-              <span className="italic truncate">{sprint.notes}</span>
-            )}
-          </div>
+        {dateRange && (
+          <div className="text-xs text-gray-400 mt-0.5">{dateRange}</div>
+        )}
+        {sprint.notes && (
+          <div className="text-xs text-gray-500 italic mt-0.5 line-clamp-2">{sprint.notes}</div>
         )}
         <div className="flex items-center gap-2 mt-1">
           <button

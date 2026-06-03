@@ -55,7 +55,7 @@ jobs:
             type=ref,event=pr
             type=sha,format=short
             type=match,pattern=v(0\.1\..+),group=1
-            type=pattern,event=tag,pattern=v(0\.1.*),value=v0.1
+            type=pattern,pattern=v(0\.1.*)
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.title=SoulPlan

@@ -28,6 +28,30 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) — a default board is auto-created on first load.
 
+## Docker
+
+Pre-built multi-arch images are published to GHCR on every push to `master` and on `v0.1*` tags.
+
+```bash
+# Pull and run (persists the SQLite DB in a named volume)
+docker run -d --name soulplan -p 3000:3000 -v soulplan-data:/app/data ghcr.io/s0uldrag0n/soulplan:latest
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+Or use the included `docker-compose.yml`:
+
+```bash
+docker compose up -d
+```
+
+Available tags:
+- `:latest` — tracks `master`
+- `:v0.1` — latest `v0.1.*` release
+- `:sha-<short>` — every build, for pinning/reproducibility
+
+Multi-arch: `linux/amd64` and `linux/arm64` (Apple Silicon, Raspberry Pi).
+
 ## License
 
 MIT

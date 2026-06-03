@@ -21,18 +21,20 @@ ENV NODE_ENV=production
 # Optionally override via env var at runtime
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Run as non-root
+# Create non-root user
 RUN addgroup --system --gid 1001 appgroup && \
-    adduser --system --uid 1001 appuser
-USER appuser
+    adduser --system --uid 1001 --ingroup appgroup appuser
+
+# Pre-create the data dir and chown to appuser while we're still root.
+# (Cannot be done after USER appuser because /app itself is owned by root.)
+RUN mkdir -p /app/data && chown -R appuser:appgroup /app/data
 
 # Copy standalone server + static assets from build
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+COPY --from=builder --chown=appuser:appgroup /app/.next/standalone ./
+COPY --from=builder --chown=appuser:appgroup /app/.next/static ./.next/static
+COPY --from=builder --chown=appuser:appgroup /app/public ./public
 
-# Create data directory for sqlite DB (writable by appuser)
-RUN mkdir -p /app/data
+USER appuser
 
 EXPOSE 3000
 

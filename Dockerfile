@@ -2,8 +2,12 @@
 FROM node:20-slim AS builder
 WORKDIR /app
 
-# Install dependencies first (layer caching)
+# Install dependencies first (layer caching).
+# The postinstall script (scripts/ensure-platform-binaries.mjs) runs during
+# `npm ci`, so we must copy it BEFORE installing — otherwise the postinstall
+# fails on a fresh build with "Cannot find module scripts/ensure-platform-binaries.mjs".
 COPY package.json package-lock.json ./
+COPY scripts/ ./scripts/
 RUN npm ci --include=dev
 
 # Copy source and build

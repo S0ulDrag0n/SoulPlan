@@ -63,7 +63,7 @@
 - useTaskMutations: error state + toast feedback
 
 ## Architecture
-- **Stack**: Next.js 15 App Router, better-sqlite3, Tailwind CSS v4, dnd-kit
+- **Stack**: Next.js 16 App Router (Turbopack), sql.js (WASM), Tailwind CSS v4, dnd-kit
 - **Database**: `sql.sql` schema, V3 migration with column validation
 - **State**: React state + optimistic updates + background API sync
 - **Build Note**: Root-owned repo — push via GitHub MCP API only, never `mcp_github_push_files` (corrupts JSX)

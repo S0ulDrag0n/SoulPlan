@@ -1,5 +1,6 @@
 import type {
   BoardRow, ReleaseRow, SprintRow, TaskRow, DependencyRow,
+  StickyNoteRow, NoteConnectionRow, NoteConnectionTargetType,
 } from './types';
 
 /**
@@ -44,4 +45,33 @@ export interface IDatabase {
   deleteDependency(id: string): Promise<void>;
   deleteDependenciesByTaskId(taskId: string): Promise<void>;
   findDependency(fromTaskId: string, toTaskId: string): Promise<DependencyRow | undefined>;
+
+  // ─── Sticky notes ────────────────────────────────────────
+  getStickyNotesByBoardId(boardId: string): Promise<StickyNoteRow[]>;
+  createStickyNote(
+    id: string,
+    boardId: string,
+    text: string,
+    x: number,
+    y: number,
+    color: string,
+    z: number
+  ): Promise<StickyNoteRow>;
+  updateStickyNote(id: string, fields: Record<string, unknown>): Promise<void>;
+  deleteStickyNote(id: string): Promise<void>;
+
+  // ─── Note connections ───────────────────────────────────
+  getNoteConnectionsByBoardId(boardId: string): Promise<NoteConnectionRow[]>;
+  createNoteConnection(
+    id: string,
+    noteId: string,
+    toType: NoteConnectionTargetType,
+    toId: string
+  ): Promise<NoteConnectionRow>;
+  deleteNoteConnection(id: string): Promise<void>;
+  findNoteConnection(
+    noteId: string,
+    toType: NoteConnectionTargetType,
+    toId: string
+  ): Promise<NoteConnectionRow | undefined>;
 }

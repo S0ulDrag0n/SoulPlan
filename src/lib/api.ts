@@ -2,7 +2,9 @@ import type {
   BoardState, CreateTaskInput, UpdateTaskInput,
   CreateReleaseInput, UpdateReleaseInput,
   CreateSprintInput, UpdateSprintInput,
-  Task, Dependency,
+  CreateStickyNoteInput, UpdateStickyNoteInput,
+  CreateNoteConnectionInput,
+  Task, Dependency, StickyNote, NoteConnection,
 } from '@/lib/types';
 
 const BASE = '/api';
@@ -103,6 +105,49 @@ export function createDependency(fromTaskId: string, toTaskId: string): Promise<
 
 export function deleteDependency(id: string): Promise<{ success: boolean }> {
   return request<{ success: boolean }>('/dependencies', {
+    method: 'DELETE',
+    body: JSON.stringify({ id }),
+  });
+}
+
+// ─── Sticky notes ─────────────────────────────────────────
+
+export function createStickyNote(input: CreateStickyNoteInput): Promise<StickyNote> {
+  return request<StickyNote>('/sticky-notes', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateStickyNote(
+  id: string,
+  input: Omit<UpdateStickyNoteInput, 'id'>
+): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/sticky-notes/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteStickyNote(id: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/sticky-notes/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+// ─── Note connections ─────────────────────────────────────
+
+export function createNoteConnection(
+  input: CreateNoteConnectionInput
+): Promise<NoteConnection> {
+  return request<NoteConnection>('/note-connections', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteNoteConnection(id: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>('/note-connections', {
     method: 'DELETE',
     body: JSON.stringify({ id }),
   });

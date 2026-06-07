@@ -27,7 +27,7 @@ export default function ReleaseBlock({
     : null;
 
   return (
-    <div className="flex flex-col min-w-[280px]">
+    <div className="flex flex-col min-w-[280px]" data-release-id={release.id}>
       {/* Release header */}
       <div className="mb-3 px-1">
         <div className="flex items-center justify-between gap-2">

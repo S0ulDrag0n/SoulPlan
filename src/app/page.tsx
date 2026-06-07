@@ -10,13 +10,19 @@ import EditReleaseModal from '@/components/EditReleaseModal';
 import EditSprintModal from '@/components/EditSprintModal';
 import DependencyLines from '@/components/DependencyLines';
 import { DependencyConnectorProvider } from '@/components/DependencyConnector';
+import StickyNote from '@/components/StickyNote';
+import NoteConnectionLines from '@/components/NoteConnectionLines';
+import { NoteConnectorProvider, useNoteConnector } from '@/components/NoteConnector';
 import PanCanvas from '@/components/PanCanvas';
 import ThemeToggle from '@/components/ThemeToggle';
 import { useBoard } from '@/hooks/useBoard';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
 import { findTaskById, resolveDropTarget } from '@/lib/transform';
-import type { Task, Release, Sprint } from '@/lib/types';
+import type { Task, Release, Sprint, StickyNote as StickyNoteModel, NoteConnectionTargetType } from '@/lib/types';
 import * as api from '@/lib/api';
+
+const STICKY_COLORS = ['yellow', 'pink', 'blue', 'green', 'purple'] as const;
+type StickyColor = (typeof STICKY_COLORS)[number];
 
 export default function Home() {
   const { boardState, setBoardState, loading, error, reload } = useBoard();
@@ -179,6 +185,131 @@ export default function Home() {
     reload();
   }, [reload]);
 
+  // ─── Sticky note handlers ─────────────────────────────────
+
+  const handleAddSticky = useCallback(async () => {
+    const state = boardStateRef.current;
+    if (!state) return;
+    // Place new note at a default position; queries.findFreeNotePosition
+    // will bump it if there's a collision.
+    await api.createStickyNote({
+      boardId: state.board.id,
+      x: 400,
+      y: 50,
+      color: 'yellow',
+    });
+    reload();
+  }, [reload]);
+
+  const handleMoveSticky = useCallback(async (id: string, x: number, y: number) => {
+    // Optimistic update
+    setBoardState((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        stickyNotes: prev.stickyNotes.map((n) =>
+          n.id === id ? { ...n, x, y } : n
+        ),
+      };
+    });
+    try {
+      await api.updateStickyNote(id, { x, y });
+    } catch (err) {
+      console.error('Failed to move sticky note:', err);
+      reload();
+    }
+  }, [reload, setBoardState]);
+
+  const handleTextChangeSticky = useCallback(async (id: string, text: string) => {
+    setBoardState((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        stickyNotes: prev.stickyNotes.map((n) =>
+          n.id === id ? { ...n, text } : n
+        ),
+      };
+    });
+    try {
+      await api.updateStickyNote(id, { text });
+    } catch (err) {
+      console.error('Failed to update sticky note text:', err);
+      reload();
+    }
+  }, [reload, setBoardState]);
+
+  const handleDeleteSticky = useCallback(async (id: string) => {
+    // Optimistic
+    setBoardState((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        stickyNotes: prev.stickyNotes.filter((n) => n.id !== id),
+        noteConnections: prev.noteConnections.filter((c) => c.noteId !== id),
+      };
+    });
+    try {
+      await api.deleteStickyNote(id);
+    } catch (err) {
+      console.error('Failed to delete sticky note:', err);
+      reload();
+    }
+  }, [reload, setBoardState]);
+
+  const handleColorCycleSticky = useCallback(async (id: string) => {
+    const state = boardStateRef.current;
+    if (!state) return;
+    const note = state.stickyNotes.find((n) => n.id === id);
+    if (!note) return;
+    const idx = STICKY_COLORS.indexOf(note.color as StickyColor);
+    const nextColor = STICKY_COLORS[(idx + 1) % STICKY_COLORS.length];
+    setBoardState((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        stickyNotes: prev.stickyNotes.map((n) =>
+          n.id === id ? { ...n, color: nextColor } : n
+        ),
+      };
+    });
+    try {
+      await api.updateStickyNote(id, { color: nextColor });
+    } catch (err) {
+      console.error('Failed to update sticky note color:', err);
+      reload();
+    }
+  }, [reload, setBoardState]);
+
+  // ─── Note connection handlers ─────────────────────────────
+
+  const handleCreateNoteConnection = useCallback(
+    async (noteId: string, toType: NoteConnectionTargetType, toId: string) => {
+      try {
+        await api.createNoteConnection({ noteId, toType, toId });
+      } catch (err) {
+        console.error('Failed to create note connection:', err);
+      }
+      reload();
+    },
+    [reload]
+  );
+
+  const handleDeleteNoteConnection = useCallback(async (id: string) => {
+    setBoardState((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        noteConnections: prev.noteConnections.filter((c) => c.id !== id),
+      };
+    });
+    try {
+      await api.deleteNoteConnection(id);
+    } catch (err) {
+      console.error('Failed to delete note connection:', err);
+      reload();
+    }
+  }, [reload, setBoardState]);
+
   // ─── Render ───────────────────────────────────────────────
 
   if (loading && !boardState) {
@@ -197,6 +328,8 @@ export default function Home() {
   if (!boardState) return null;
 
   const allDependencies = boardState.dependencies;
+  const allStickyNotes = boardState.stickyNotes;
+  const allNoteConnections = boardState.noteConnections;
 
   return (
     <div className="h-screen flex flex-col bg-gray-100 dark:bg-gray-900 transition-colors">
@@ -213,6 +346,13 @@ export default function Home() {
           {saving ? <span className="text-sm text-gray-400 dark:text-gray-500">Saving...</span> : null}
           <ThemeToggle />
           <button
+            onClick={handleAddSticky}
+            className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-600 transition-colors text-sm font-medium"
+            title="Add a sticky note anywhere on the board"
+          >
+            + Sticky
+          </button>
+          <button
             onClick={handleAddRelease}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors text-sm font-medium"
           >
@@ -221,52 +361,75 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Board — Miro-style pannable canvas with dependency connector */}
-      <DependencyConnectorProvider
-        dependencies={allDependencies}
-        onCreateDependency={handleCreateDependency}
-        containerRef={boardContainerRef}
+      {/* Board — Miro-style pannable canvas with dependency + note connectors */}
+      <NoteConnectorProvider
+        noteConnections={allNoteConnections}
+        onCreateConnection={handleCreateNoteConnection}
       >
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEndAndRefresh}
+        <DependencyConnectorProvider
+          dependencies={allDependencies}
+          onCreateDependency={handleCreateDependency}
+          containerRef={boardContainerRef}
         >
-          <PanCanvas className="flex-1">
-            <div ref={boardContainerRef} className="relative p-8">
-              <div className="relative flex gap-6 min-h-[400px]">
-                <DependencyLines
-                  dependencies={allDependencies}
-                  containerRef={boardContainerRef}
-                  onDeleteDependency={handleDeleteDependency}
-                />
-                {boardState.releases.map((release) => (
-                  <ReleaseBlock
-                    key={release.id}
-                    release={release}
-                    onAddSprint={handleAddSprint}
-                    onEditRelease={setEditingRelease}
-                    onDeleteRelease={handleDeleteRelease}
-                    onAddTask={handleAddTask}
-                    onEditTask={setEditingTask}
-                    onDeleteTask={handleDeleteTask}
-                    onEditSprint={setEditingSprint}
-                    onDeleteSprint={handleDeleteSprint}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEndAndRefresh}
+          >
+            <PanCanvas className="flex-1">
+              <div ref={boardContainerRef} className="relative p-8">
+                <div className="relative flex gap-6 min-h-[400px]">
+                  <DependencyLines
                     dependencies={allDependencies}
-                    onJumpToTask={handleJumpToTask}
+                    containerRef={boardContainerRef}
+                    onDeleteDependency={handleDeleteDependency}
                   />
-                ))}
-              </div>
-            </div>
-          </PanCanvas>
+                  {boardState.releases.map((release) => (
+                    <ReleaseBlock
+                      key={release.id}
+                      release={release}
+                      onAddSprint={handleAddSprint}
+                      onEditRelease={setEditingRelease}
+                      onDeleteRelease={handleDeleteRelease}
+                      onAddTask={handleAddTask}
+                      onEditTask={setEditingTask}
+                      onDeleteTask={handleDeleteTask}
+                      onEditSprint={setEditingSprint}
+                      onDeleteSprint={handleDeleteSprint}
+                      dependencies={allDependencies}
+                      onJumpToTask={handleJumpToTask}
+                    />
+                  ))}
+                </div>
 
-          {/* DragOverlay outside PanCanvas so it's not affected by pan transform */}
-          <DragOverlay>
-            {activeTask ? <DragOverlayTask task={activeTask} /> : null}
-          </DragOverlay>
-        </DndContext>
-      </DependencyConnectorProvider>
+                {/* Note connection lines — share the boardContainerRef so
+                    selectors find both sticky notes and target cards. */}
+                <NoteConnectionLines
+                  connections={allNoteConnections}
+                  containerRef={boardContainerRef}
+                  onDelete={handleDeleteNoteConnection}
+                />
+
+                {/* Sticky notes layer — sibling of the releases row, inside
+                    the same container so they pan together and share coords. */}
+                <NoteLayer
+                  notes={allStickyNotes}
+                  onMove={handleMoveSticky}
+                  onTextChange={handleTextChangeSticky}
+                  onDelete={handleDeleteSticky}
+                  onColorCycle={handleColorCycleSticky}
+                />
+              </div>
+            </PanCanvas>
+
+            {/* DragOverlay outside PanCanvas so it's not affected by pan transform */}
+            <DragOverlay>
+              {activeTask ? <DragOverlayTask task={activeTask} /> : null}
+            </DragOverlay>
+          </DndContext>
+        </DependencyConnectorProvider>
+      </NoteConnectorProvider>
 
       {/* Modals */}
       {editingTask ? (
@@ -292,6 +455,38 @@ export default function Home() {
         />
       ) : null}
     </div>
+  );
+}
+
+/** Renders sticky notes and wires the connector handle to the provider. */
+function NoteLayer({
+  notes,
+  onMove,
+  onTextChange,
+  onDelete,
+  onColorCycle,
+}: {
+  notes: StickyNoteModel[];
+  onMove: (id: string, x: number, y: number) => void;
+  onTextChange: (id: string, text: string) => void;
+  onDelete: (id: string) => void;
+  onColorCycle: (id: string) => void;
+}) {
+  const { startConnection } = useNoteConnector();
+  return (
+    <>
+      {notes.map((note) => (
+        <StickyNote
+          key={note.id}
+          note={note}
+          onMove={onMove}
+          onTextChange={onTextChange}
+          onDelete={onDelete}
+          onColorCycle={onColorCycle}
+          onConnectionDragStart={startConnection}
+        />
+      ))}
+    </>
   );
 }
 

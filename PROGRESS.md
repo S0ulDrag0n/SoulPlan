@@ -62,6 +62,13 @@
 - adapter.ts: direct DB access, consistent error mapping
 - useTaskMutations: error state + toast feedback
 
+### ConnectionLines Refactor ✅
+- Extracted generic SVG line renderer from `DependencyLines` into `ConnectionLines`
+- Domain-agnostic core: Bézier/loop-arc geometry, theme-aware coloring, click-to-delete hit areas, resize/theme/pan redraw observers
+- Declarative `ConnectionSpec` API: callers pass CSS selectors, no DOM-lookup coupling
+- `commonAncestorSelector` generalizes the same-sprint loop-arc test for future connection types
+- `DependencyLines` is now a 30-line adapter; no public API change; `page.tsx` untouched
+
 ## Architecture
 - **Stack**: Next.js 16 App Router (Turbopack), sql.js (WASM), Tailwind CSS v4, dnd-kit
 - **Database**: `sql.sql` schema, V3 migration with column validation

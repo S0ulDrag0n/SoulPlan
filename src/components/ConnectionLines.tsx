@@ -51,14 +51,14 @@ export interface ConnectionSpec {
   commonAncestorSelector?: string;
   /**
    * Optional: which edge of the source card the line exits from.
-   * Default: 'right' (mid-right edge).
+   * Default: 'auto' (the edge facing the target is chosen automatically).
    */
-  fromEdge?: 'left' | 'right';
+  fromEdge?: 'left' | 'right' | 'top' | 'bottom' | 'auto';
   /**
    * Optional: which edge of the target card the line enters at.
-   * Default: 'left' (mid-left edge, with arrowhead pointing inward).
+   * Default: 'auto' (the edge facing the source is chosen automatically).
    */
-  toEdge?: 'left' | 'right';
+  toEdge?: 'left' | 'right' | 'top' | 'bottom' | 'auto';
   /**
    * Optional visual override — a CSS color for the line + arrowhead.
    * If omitted, uses the theme-aware slate defaults.
@@ -89,6 +89,8 @@ interface ComputedLine {
   y2: number;
   sameColumn: boolean;
   color: string;
+  fromEdge: 'left' | 'right' | 'top' | 'bottom';
+  toEdge: 'left' | 'right' | 'top' | 'bottom';
 }
 
 /**
@@ -101,13 +103,37 @@ function bezierEndTangent(p2: number[], p3: number[]): number {
 
 /**
  * Resolve a point on the edge of a rect.
- * For 'right' returns the mid-right; for 'left' returns the mid-left.
+ * - 'right' returns the mid-right edge
+ * - 'left' returns the mid-left edge
+ * - 'top' returns the mid-top edge
+ * - 'bottom' returns the mid-bottom edge
  */
-function edgePoint(rect: DOMRect, edge: 'left' | 'right'): { x: number; y: number } {
-  if (edge === 'right') {
-    return { x: rect.right, y: rect.top + rect.height / 2 };
+function edgePoint(rect: DOMRect, edge: 'left' | 'right' | 'top' | 'bottom'): { x: number; y: number } {
+  switch (edge) {
+    case 'right':  return { x: rect.right, y: rect.top + rect.height / 2 };
+    case 'left':   return { x: rect.left,  y: rect.top + rect.height / 2 };
+    case 'top':    return { x: rect.left + rect.width / 2, y: rect.top };
+    case 'bottom': return { x: rect.left + rect.width / 2, y: rect.bottom };
   }
-  return { x: rect.left, y: rect.top + rect.height / 2 };
+}
+
+/**
+ * Pick the edge of `fromRect` that faces `toRect` (or vice versa).
+ * Uses the relative angle: if the other rect is mostly to the left/right
+ * of this one, return a horizontal edge; otherwise vertical.
+ */
+function autoEdge(thisRect: DOMRect, otherRect: DOMRect): 'left' | 'right' | 'top' | 'bottom' {
+  const thisCx = thisRect.left + thisRect.width / 2;
+  const thisCy = thisRect.top + thisRect.height / 2;
+  const otherCx = otherRect.left + otherRect.width / 2;
+  const otherCy = otherRect.top + otherRect.height / 2;
+  const dx = otherCx - thisCx;
+  const dy = otherCy - thisCy;
+  // Use the larger axis to pick the edge.
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx > 0 ? 'right' : 'left';
+  }
+  return dy > 0 ? 'bottom' : 'top';
 }
 
 export default function ConnectionLines({
@@ -160,8 +186,10 @@ export default function ConnectionLines({
           sameColumn = !!(fromAnc && toAnc && fromAnc === toAnc);
         }
 
-        const fromEdge = conn.fromEdge ?? 'right';
-        const toEdge = conn.toEdge ?? 'left';
+        const fromEdgeRaw = conn.fromEdge ?? 'auto';
+        const toEdgeRaw = conn.toEdge ?? 'auto';
+        const fromEdge = fromEdgeRaw === 'auto' ? autoEdge(fromRect, toRect) : fromEdgeRaw;
+        const toEdge = toEdgeRaw === 'auto' ? autoEdge(toRect, fromRect) : toEdgeRaw;
         const fromPt = edgePoint(fromRect, fromEdge);
         const toPt = edgePoint(toRect, toEdge);
 
@@ -176,6 +204,8 @@ export default function ConnectionLines({
           x1, y1, x2, y2,
           sameColumn,
           color: conn.color ?? defaultColor,
+          fromEdge,
+          toEdge,
         });
       }
 
@@ -191,11 +221,23 @@ export default function ConnectionLines({
           p3 = [line.x2, line.y2];
           pathD = `M ${p0[0]} ${p0[1]} C ${p1c[0]} ${p1c[1]}, ${p2[0]} ${p2[1]}, ${p3[0]} ${p3[1]}`;
         } else {
+          // Control points extend in the direction of each endpoint's edge,
+          // so the curve leaves the source and enters the target perpendicular
+          // to the chosen edge.
           const dx = line.x2 - line.x1;
-          const cpOffset = Math.max(Math.abs(dx) * 0.4, 50);
+          const dy = line.y2 - line.y1;
+          const cpOffset = Math.max(Math.sqrt(dx * dx + dy * dy) * 0.4, 50);
           const p0 = [line.x1, line.y1];
-          const p1c = [line.x1 + cpOffset, line.y1];
-          p2 = [line.x2 - cpOffset, line.y2];
+          const p1c =
+            line.fromEdge === 'right'  ? [line.x1 + cpOffset, line.y1] :
+            line.fromEdge === 'left'   ? [line.x1 - cpOffset, line.y1] :
+            line.fromEdge === 'bottom' ? [line.x1, line.y1 + cpOffset] :
+                                         [line.x1, line.y1 - cpOffset];
+          p2 =
+            line.toEdge === 'right'    ? [line.x2 + cpOffset, line.y2] :
+            line.toEdge === 'left'     ? [line.x2 - cpOffset, line.y2] :
+            line.toEdge === 'bottom'   ? [line.x2, line.y2 + cpOffset] :
+                                         [line.x2, line.y2 - cpOffset];
           p3 = [line.x2, line.y2];
           pathD = `M ${p0[0]} ${p0[1]} C ${p1c[0]} ${p1c[1]}, ${p2[0]} ${p2[1]}, ${p3[0]} ${p3[1]}`;
         }

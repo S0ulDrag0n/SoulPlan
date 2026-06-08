@@ -21,9 +21,11 @@ interface NoteConnectionLinesProps {
  *   - sprint → [data-sprint-id="..."]
  *   - release → [data-release-id="..."]  (added to ReleaseBlock for this feature)
  *
- * Edge policy: lines always exit the note on the right and enter the target
- * on the left. This is a deliberate choice — flipping edges per-target-type
- * would be more "correct" but creates visual inconsistency.
+ * Edge policy: ConnectionLines picks the source/target edge automatically
+ * based on the relative position of the two endpoints (smart edge selection).
+ * This avoids the line routing through the source's own bounding box when
+ * the target is roughly below or above the source — see the autoEdge helper
+ * in ConnectionLines.
  *
  * Same-column: notes are free-floating, so they never share a sprint
  * ancestor with a task. We omit commonAncestorSelector and let
@@ -40,8 +42,6 @@ export default function NoteConnectionLines({
         id: conn.id,
         fromSelector: `[data-sticky-id="${conn.noteId}"]`,
         toSelector: selectorForTarget(conn.toType, conn.toId),
-        fromEdge: 'right',
-        toEdge: 'left',
       })),
     [connections]
   );

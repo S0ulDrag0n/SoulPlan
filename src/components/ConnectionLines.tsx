@@ -153,11 +153,91 @@ export default function ConnectionLines({
       const svg = svgRef.current;
       if (!container || !svg) return;
 
-      const svgRect = svg.getBoundingClientRect();
+      // The SVG is `absolute top-0 left-0` inside the container, so its
+      // local origin sits at the container's PADDING-BOX top-left (clientLeft/
+      // clientTop account for the container's border, which our container
+      // doesn't have but we handle defensively in case a future caller has one).
+      const containerRect = container.getBoundingClientRect();
+      const svgOriginX = containerRect.left + container.clientLeft;
+      const svgOriginY = containerRect.top + container.clientTop;
 
-      // Size SVG to match container's scrollable area
-      svg.setAttribute('width', container.scrollWidth.toString());
-      svg.setAttribute('height', container.scrollHeight.toString());
+      // ─── Pass 1: collect all endpoint rects in viewport coords ───
+      //
+      // We do a first pass to compute the union bounding box of every
+      // connection endpoint BEFORE sizing the SVG. The old code sized the
+      // SVG to `container.scrollWidth/scrollHeight`, which has two blind spots:
+      //
+      //   1. Absolutely-positioned descendants with NEGATIVE coords (e.g. a
+      //      sticky note dragged above the releases row to y = -100 in
+      //      pan-space) don't always contribute to scrollHeight — the
+      //      container's scrollable area is computed relative to its own
+      //      padding-box, so content above the padding-box top is clipped out
+      //      of the measurement.
+      //   2. Bézier control points can extend a line's reach outside the
+      //      endpoints by up to ~40% of the line length. A line from a
+      //      sticky far above the board to a release's left edge bows out
+      //      beyond either endpoint.
+      //
+      // The result was that lines for stickies positioned outside the
+      // releases row were clipped by the SVG's default `overflow: hidden`
+      // before reaching the target. We fix it by sizing the SVG to the
+      // union of every endpoint rect (with a Bézier-overshoot margin) so
+      // the SVG's viewport always covers the full line, regardless of
+      // where the source lives on the pannable canvas.
+      const endpoints: { rect: DOMRect }[] = [];
+      for (const conn of connections) {
+        const fromEl = container.querySelector(conn.fromSelector) as HTMLElement | null;
+        const toEl = container.querySelector(conn.toSelector) as HTMLElement | null;
+        if (!fromEl || !toEl) continue;
+        endpoints.push({ rect: fromEl.getBoundingClientRect() });
+        endpoints.push({ rect: toEl.getBoundingClientRect() });
+      }
+
+      // Union bounding box in viewport coords, then convert to SVG-local.
+      // If we have no endpoints, fall back to the container's scrollable
+      // area so a fresh board still has a sensible (zero-line) SVG.
+      const margin = 200; // headroom for Bézier control-point overshoot
+      let svgW: number;
+      let svgH: number;
+      if (endpoints.length > 0) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const { rect } of endpoints) {
+          if (rect.left   < minX) minX = rect.left;
+          if (rect.top    < minY) minY = rect.top;
+          if (rect.right  > maxX) maxX = rect.right;
+          if (rect.bottom > maxY) maxY = rect.bottom;
+        }
+        // Position the SVG so its viewport edges are at [minX - margin, maxX + margin]
+        // horizontally and [minY - margin, maxY + margin] vertically — i.e. the
+        // leftmost/topmost endpoint is `margin` pixels inside the SVG from the
+        // left/top edge, and the rightmost/bottommost is `margin` inside from
+        // the right/bottom edge. That gives the Bézier control points enough
+        // room to overshoot without being clipped by `overflow: hidden`.
+        //
+        // The SVG's `left`/`top` is relative to the container's padding-box
+        // origin (svgOriginX, svgOriginY in viewport coords). For our
+        // borderless container svgOriginX === containerRect.left.
+        const targetLeftViewport = minX - margin;
+        const targetTopViewport = minY - margin;
+        const targetRightViewport = maxX + margin;
+        const targetBottomViewport = maxY + margin;
+        const offsetX = targetLeftViewport - svgOriginX;
+        const offsetY = targetTopViewport - svgOriginY;
+        if (offsetX !== 0) svg.style.left = `${offsetX}px`; else svg.style.removeProperty('left');
+        if (offsetY !== 0) svg.style.top  = `${offsetY}px`; else svg.style.removeProperty('top');
+        svgW = Math.max(1, targetRightViewport - targetLeftViewport);
+        svgH = Math.max(1, targetBottomViewport - targetTopViewport);
+      } else {
+        // No connections yet — keep the SVG covering the scrollable area
+        // (matches the old behavior for an empty board).
+        svgW = container.scrollWidth;
+        svgH = container.scrollHeight;
+        svg.style.removeProperty('left');
+        svg.style.removeProperty('top');
+      }
+
+      svg.setAttribute('width', svgW.toString());
+      svg.setAttribute('height', svgH.toString());
 
       // Remove old lines
       const existing = svg.querySelectorAll('.conn-line, .conn-arrow, .conn-hit');
@@ -193,11 +273,14 @@ export default function ConnectionLines({
         const fromPt = edgePoint(fromRect, fromEdge);
         const toPt = edgePoint(toRect, toEdge);
 
-        // Convert viewport coords to SVG-local coords
-        const x1 = fromPt.x - svgRect.left;
-        const y1 = fromPt.y - svgRect.top;
-        const x2 = toPt.x - svgRect.left;
-        const y2 = toPt.y - svgRect.top;
+        // Convert viewport coords to SVG-local coords. We re-read svgRect
+        // per-line (cheap — it's a layout read) so any pan/zoom that
+        // happened between sizing and the per-line loop stays consistent.
+        const cur = svg.getBoundingClientRect();
+        const x1 = fromPt.x - cur.left;
+        const y1 = fromPt.y - cur.top;
+        const x2 = toPt.x - cur.left;
+        const y2 = toPt.y - cur.top;
 
         lines.push({
           id: conn.id,

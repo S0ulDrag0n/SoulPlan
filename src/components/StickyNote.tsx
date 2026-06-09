@@ -49,6 +49,25 @@ export default function StickyNote({
     if (!editing) setText(note.text);
   }, [note.text, editing]);
 
+  // On edit-mode entry, sync the DOM text node to the current `text` state.
+  // We don't render React-managed text as children during edit (see JSX
+  // below) — so the DOM owns the content while editing — but we still need
+  // to seed the editable area with the previously-saved text when the user
+  // double-clicks an existing note. This effect runs once on the false→true
+  // transition, which is exactly what we want.
+  useEffect(() => {
+    if (editing && textRef.current) {
+      // Only seed if the DOM is empty or stale (e.g. just entered edit mode).
+      // We rely on this effect being gated on the editing transition; once
+      // the user is typing, we don't want to clobber their cursor position.
+      textRef.current.textContent = text;
+    }
+    // Intentionally only re-run when `editing` flips. The `text` read inside
+    // captures the value at the moment of the transition; subsequent typing
+    // updates the DOM directly via the browser's input handling.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
   // ── Drag-to-move (header only) ───────────────────────────
   const handleHeaderPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -201,7 +220,16 @@ export default function StickyNote({
         </div>
       </div>
 
-      {/* Body — editable text */}
+      {/* Body — editable text.
+
+          While editing, the DOM owns the text content (the browser inserts
+          characters at the caret). Rendering React-managed text as children
+          during edit causes React to re-set the text node's `nodeValue` on
+          every input event, which collapses the caret back to position 0 —
+          making new characters insert at the start of the text and visibly
+          REVERSE the user's typing. We sidestep this by rendering `null`
+          as children while editing; the placeholder/note-text only renders
+          when editing is off. */}
       <div
         ref={textRef}
         contentEditable={editing}
@@ -215,7 +243,7 @@ export default function StickyNote({
         }`}
         style={{ minHeight: NOTE_MIN_HEIGHT - 30 }}
       >
-        {text || (editing ? '' : <span className="text-gray-500/60 italic">Double-click to edit</span>)}
+        {editing ? null : (text || <span className="text-gray-500/60 italic">Double-click to edit</span>)}
       </div>
 
       {/* Connector handle — right-edge dot for creating connections */}

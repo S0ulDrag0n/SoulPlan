@@ -62,8 +62,25 @@
 - adapter.ts: direct DB access, consistent error mapping
 - useTaskMutations: error state + toast feedback
 
+### ConnectionLines Refactor ✅
+- Extracted generic SVG line renderer from `DependencyLines` into `ConnectionLines`
+- Domain-agnostic core: Bézier/loop-arc geometry, theme-aware coloring, click-to-delete hit areas, resize/theme/pan redraw observers
+- Declarative `ConnectionSpec` API: callers pass CSS selectors, no DOM-lookup coupling
+- `commonAncestorSelector` generalizes the same-sprint loop-arc test for future connection types
+- `DependencyLines` is now a 30-line adapter; no public API change; `page.tsx` untouched
+
+### Sticky Notes (Miro-lite) ✅
+- Free-floating notes anywhere on the board canvas with `(x, y)` in pan-space
+- Polymorphic connections: note → task | sprint | release
+- Drag from the right-edge handle on a note to drop a connection line
+- Inline contenteditable text (double-click body)
+- Header-drag to move; shift+click to cycle color (yellow/pink/blue/green/purple)
+- Cascade cleanup: deleting a release cleans up connections to its sprints/tasks too
+- Same `ConnectionLines` core renders both dependency lines and note lines, with different colors
+- `data-release-id` added to `ReleaseBlock` so the line system can find release elements
+
 ## Architecture
 - **Stack**: Next.js 16 App Router (Turbopack), sql.js (WASM), Tailwind CSS v4, dnd-kit
-- **Database**: `sql.sql` schema, V3 migration with column validation
+- **Database**: V4 migration adds `sticky_notes` (board-anchored, free-positioned) + `note_connections` (polymorphic FK-less, application-level cascade)
 - **State**: React state + optimistic updates + background API sync
 - **Build Note**: Root-owned repo — push via GitHub MCP API only, never `mcp_github_push_files` (corrupts JSX)

@@ -1,8 +1,10 @@
 import type {
   BoardRow, ReleaseRow, SprintRow, TaskRow, DependencyRow,
+  StickyNoteRow, NoteConnectionRow,
 } from './db/types';
 import type {
   Board, Release, Sprint, Task, Dependency, BoardState,
+  StickyNote, NoteConnection,
   SprintWithTasks,
 } from './types';
 
@@ -67,6 +69,30 @@ export function toDependency(row: DependencyRow): Dependency {
   };
 }
 
+export function toStickyNote(row: StickyNoteRow): StickyNote {
+  return {
+    id: row.id,
+    boardId: row.board_id,
+    text: row.text,
+    x: row.x,
+    y: row.y,
+    color: row.color,
+    z: row.z,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function toNoteConnection(row: NoteConnectionRow): NoteConnection {
+  return {
+    id: row.id,
+    noteId: row.note_id,
+    toType: row.to_type,
+    toId: row.to_id,
+    createdAt: row.created_at,
+  };
+}
+
 // ─── Model → DB column transforms (pure functions) ───────────
 
 export function taskToRow(task: Partial<Task> & { id: string }): Record<string, unknown> {
@@ -100,6 +126,16 @@ export function releaseToRow(release: Partial<Release> & { id: string }): Record
   return row;
 }
 
+export function stickyNoteToRow(note: Partial<StickyNote> & { id: string }): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  if (note.text !== undefined) row.text = note.text;
+  if (note.x !== undefined) row.x = note.x;
+  if (note.y !== undefined) row.y = note.y;
+  if (note.color !== undefined) row.color = note.color;
+  if (note.z !== undefined) row.z = note.z;
+  return row;
+}
+
 // ─── Board state assembly (pure function) ─────────────────────
 
 export function assembleBoardState(
@@ -107,11 +143,15 @@ export function assembleBoardState(
   releases: ReleaseRow[],
   sprints: SprintRow[],
   tasks: TaskRow[],
-  dependencies: DependencyRow[]
+  dependencies: DependencyRow[],
+  stickyNotes: StickyNoteRow[] = [],
+  noteConnections: NoteConnectionRow[] = []
 ): BoardState {
   const taskModels = tasks.map(toTask);
   const sprintModels = sprints.map(toSprint);
   const depModels = dependencies.map(toDependency);
+  const noteModels = stickyNotes.map(toStickyNote);
+  const noteConnModels = noteConnections.map(toNoteConnection);
 
   return {
     board: toBoard(board),
@@ -127,6 +167,8 @@ export function assembleBoardState(
       };
     }),
     dependencies: depModels,
+    stickyNotes: noteModels,
+    noteConnections: noteConnModels,
   };
 }
 

@@ -50,3 +50,25 @@ export interface DependencyRow {
   to_task_id: string;
   created_at: string;
 }
+
+export interface StickyNoteRow {
+  id: string;
+  board_id: string;
+  text: string;
+  x: number;
+  y: number;
+  color: string;
+  z: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type NoteConnectionTargetType = 'task' | 'sprint' | 'release';
+
+export interface NoteConnectionRow {
+  id: string;
+  note_id: string;
+  to_type: NoteConnectionTargetType;
+  to_id: string;
+  created_at: string;
+}

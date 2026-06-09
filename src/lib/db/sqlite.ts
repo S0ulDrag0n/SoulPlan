@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import type { IDatabase } from './adapter';
 import type {
   BoardRow, ReleaseRow, SprintRow, TaskRow, DependencyRow,
+  StickyNoteRow, NoteConnectionRow, NoteConnectionTargetType,
 } from './types';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -40,6 +41,7 @@ async function initialize(): Promise<SqlJsDatabase> {
   migrate(db);
   migrateV2(db);
   migrateV3(db);
+  migrateV4(db);
   return db;
 }
 
@@ -120,6 +122,48 @@ function migrateV3(db: SqlJsDatabase): void {
     db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_dep_unique ON dependencies(from_task_id, to_task_id)');
   } catch {
     // Index may already exist or data has duplicates — skip gracefully
+  }
+}
+
+function migrateV4(db: SqlJsDatabase): void {
+  // Sticky notes — free-floating text notes anchored to a board, with
+  // pan-space (x, y) coordinates. Cascade-delete with their board.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS sticky_notes (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL,
+      text TEXT NOT NULL DEFAULT '',
+      x REAL NOT NULL DEFAULT 0,
+      y REAL NOT NULL DEFAULT 0,
+      color TEXT NOT NULL DEFAULT 'yellow',
+      z INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Polymorphic connections: a sticky note → task | sprint | release.
+  // No FK on to_id because to_id is polymorphic; cleanup is enforced in
+  // the SqlJsDataAdapter (see deleteTask / deleteSprint / deleteRelease
+  // which now also clean up note_connections referencing them).
+  // Cascade-delete with their parent note.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS note_connections (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      to_type TEXT NOT NULL CHECK (to_type IN ('task', 'sprint', 'release')),
+      to_id TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (note_id) REFERENCES sticky_notes(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Idempotency: no two identical (note, target) connections
+  try {
+    db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_note_conn_unique ON note_connections(note_id, to_type, to_id)');
+  } catch {
+    // Existing data may have duplicates — skip gracefully
   }
 }
 
@@ -207,6 +251,34 @@ class SqlJsDataAdapter implements IDatabase {
   }
 
   async deleteRelease(id: string): Promise<void> {
+    // Note connections are polymorphic and FK-less, so we must manually
+    // cascade-clean them for any sprints/tasks that live under this release.
+    // Order: tasks (most specific) → sprints → release.
+    const sprintIds = getAll(
+      this.db,
+      'SELECT id FROM sprints WHERE release_id = ?',
+      [id]
+    ).map(r => r.id as string);
+    if (sprintIds.length > 0) {
+      const taskIds = getAll(
+        this.db,
+        `SELECT id FROM tasks WHERE sprint_id IN (${sprintIds.map(() => '?').join(',')})`,
+        sprintIds
+      ).map(r => r.id as string);
+      for (const taskId of taskIds) {
+        this.db.run(
+          'DELETE FROM note_connections WHERE to_type = ? AND to_id = ?',
+          ['task', taskId]
+        );
+      }
+      for (const sprintId of sprintIds) {
+        this.db.run(
+          'DELETE FROM note_connections WHERE to_type = ? AND to_id = ?',
+          ['sprint', sprintId]
+        );
+      }
+    }
+    this.db.run('DELETE FROM note_connections WHERE to_type = ? AND to_id = ?', ['release', id]);
     this.db.run('DELETE FROM releases WHERE id = ?', [id]);
     saveToDisk(this.db);
   }
@@ -247,6 +319,20 @@ class SqlJsDataAdapter implements IDatabase {
   }
 
   async deleteSprint(id: string): Promise<void> {
+    // Tasks under this sprint get cascaded via FK, but note_connections
+    // targeting those tasks don't (polymorphic, no FK). Clean them up first.
+    const taskIds = getAll(
+      this.db,
+      'SELECT id FROM tasks WHERE sprint_id = ?',
+      [id]
+    ).map(r => r.id as string);
+    for (const taskId of taskIds) {
+      this.db.run(
+        'DELETE FROM note_connections WHERE to_type = ? AND to_id = ?',
+        ['task', taskId]
+      );
+    }
+    this.db.run('DELETE FROM note_connections WHERE to_type = ? AND to_id = ?', ['sprint', id]);
     this.db.run('DELETE FROM sprints WHERE id = ?', [id]);
     saveToDisk(this.db);
   }
@@ -304,6 +390,7 @@ class SqlJsDataAdapter implements IDatabase {
 
   async deleteTask(id: string): Promise<void> {
     this.db.run('DELETE FROM dependencies WHERE from_task_id = ? OR to_task_id = ?', [id, id]);
+    this.db.run('DELETE FROM note_connections WHERE to_type = ? AND to_id = ?', ['task', id]);
     this.db.run('DELETE FROM tasks WHERE id = ?', [id]);
     saveToDisk(this.db);
   }
@@ -345,5 +432,102 @@ class SqlJsDataAdapter implements IDatabase {
   async findDependency(fromTaskId: string, toTaskId: string): Promise<DependencyRow | undefined> {
     const row = getOne(this.db, 'SELECT * FROM dependencies WHERE from_task_id = ? AND to_task_id = ?', [fromTaskId, toTaskId]);
     return row as unknown as DependencyRow | undefined;
+  }
+
+  // ─── Sticky notes ────────────────────────────────────────
+
+  async getStickyNotesByBoardId(boardId: string): Promise<StickyNoteRow[]> {
+    return getAll(
+      this.db,
+      'SELECT * FROM sticky_notes WHERE board_id = ? ORDER BY z, created_at',
+      [boardId]
+    ) as unknown as StickyNoteRow[];
+  }
+
+  async createStickyNote(
+    id: string,
+    boardId: string,
+    text: string,
+    x: number,
+    y: number,
+    color: string,
+    z: number
+  ): Promise<StickyNoteRow> {
+    this.db.run(
+      'INSERT INTO sticky_notes (id, board_id, text, x, y, color, z) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, boardId, text, x, y, color, z]
+    );
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM sticky_notes WHERE id = ?', [id]);
+    return row as unknown as StickyNoteRow;
+  }
+
+  async updateStickyNote(id: string, fields: Record<string, unknown>): Promise<void> {
+    const allowedKeys = ['text', 'x', 'y', 'color', 'z'] as const;
+    const sets: string[] = [];
+    const values: SqlValue[] = [];
+    for (const [key, value] of Object.entries(fields)) {
+      if ((allowedKeys as readonly string[]).includes(key)) {
+        sets.push(`${key} = ?`);
+        values.push(value as SqlValue);
+      }
+    }
+    if (sets.length === 0) return;
+    // Bump updated_at on every edit so the client can detect unsaved changes
+    // if it ever needs to (cheap, useful for future "modified" indicators).
+    sets.push("updated_at = datetime('now')");
+    values.push(id);
+    this.db.run(`UPDATE sticky_notes SET ${sets.join(', ')} WHERE id = ?`, values);
+    saveToDisk(this.db);
+  }
+
+  async deleteStickyNote(id: string): Promise<void> {
+    this.db.run('DELETE FROM sticky_notes WHERE id = ?', [id]);
+    saveToDisk(this.db);
+  }
+
+  // ─── Note connections ───────────────────────────────────
+
+  async getNoteConnectionsByBoardId(boardId: string): Promise<NoteConnectionRow[]> {
+    return getAll(
+      this.db,
+      `SELECT nc.* FROM note_connections nc
+         INNER JOIN sticky_notes sn ON sn.id = nc.note_id
+         WHERE sn.board_id = ?`,
+      [boardId]
+    ) as unknown as NoteConnectionRow[];
+  }
+
+  async createNoteConnection(
+    id: string,
+    noteId: string,
+    toType: NoteConnectionTargetType,
+    toId: string
+  ): Promise<NoteConnectionRow> {
+    this.db.run(
+      'INSERT INTO note_connections (id, note_id, to_type, to_id) VALUES (?, ?, ?, ?)',
+      [id, noteId, toType, toId]
+    );
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM note_connections WHERE id = ?', [id]);
+    return row as unknown as NoteConnectionRow;
+  }
+
+  async deleteNoteConnection(id: string): Promise<void> {
+    this.db.run('DELETE FROM note_connections WHERE id = ?', [id]);
+    saveToDisk(this.db);
+  }
+
+  async findNoteConnection(
+    noteId: string,
+    toType: NoteConnectionTargetType,
+    toId: string
+  ): Promise<NoteConnectionRow | undefined> {
+    const row = getOne(
+      this.db,
+      'SELECT * FROM note_connections WHERE note_id = ? AND to_type = ? AND to_id = ?',
+      [noteId, toType, toId]
+    );
+    return row as unknown as NoteConnectionRow | undefined;
   }
 }

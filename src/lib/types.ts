@@ -52,6 +52,31 @@ export interface Dependency {
   createdAt: string;
 }
 
+/** Free-floating sticky note on the board canvas. (x, y) are in pan-space coords. */
+export interface StickyNote {
+  id: string;
+  boardId: string;
+  text: string;
+  x: number;
+  y: number;
+  color: string;
+  z: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Polymorphic target type for a note connection. */
+export type NoteConnectionTargetType = 'task' | 'sprint' | 'release';
+
+/** A connection from a sticky note to a task, sprint, or release. */
+export interface NoteConnection {
+  id: string;
+  noteId: string;
+  toType: NoteConnectionTargetType;
+  toId: string;
+  createdAt: string;
+}
+
 /** Nested board state returned by GET /api/board */
 export interface BoardState {
   board: Board;
@@ -59,6 +84,8 @@ export interface BoardState {
     sprints: (Sprint & { tasks: Task[] })[];
   })[];
   dependencies: Dependency[];
+  stickyNotes: StickyNote[];
+  noteConnections: NoteConnection[];
 }
 
 /** Release with nested sprints & tasks — as used in BoardState */
@@ -118,4 +145,30 @@ export interface UpdateSprintInput {
   startDate?: string | null;
   endDate?: string | null;
   notes?: string | null;
+}
+
+/** Input shape for creating a sticky note. x/y are pan-space coords. */
+export interface CreateStickyNoteInput {
+  boardId: string;
+  text?: string;
+  x: number;
+  y: number;
+  color?: string;
+}
+
+/** Input shape for updating a sticky note. */
+export interface UpdateStickyNoteInput {
+  id: string;
+  text?: string;
+  x?: number;
+  y?: number;
+  color?: string;
+  z?: number;
+}
+
+/** Input shape for creating a note connection. */
+export interface CreateNoteConnectionInput {
+  noteId: string;
+  toType: NoteConnectionTargetType;
+  toId: string;
 }

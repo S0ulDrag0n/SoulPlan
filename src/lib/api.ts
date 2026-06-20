@@ -36,8 +36,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 // ─── Board ─────────────────────────────────────────────────
 
-export function fetchBoard(boardId?: string): Promise<BoardState> {
-  const qs = boardId ? `?boardId=${encodeURIComponent(boardId)}` : '';
+export function fetchBoard(projectId?: string): Promise<BoardState> {
+  const qs = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
   return request<BoardState>(`/board${qs}`);
 }
 

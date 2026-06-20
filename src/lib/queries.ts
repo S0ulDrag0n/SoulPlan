@@ -73,6 +73,17 @@ export async function getBoardsByProjectId(projectId: string): Promise<BoardStat
   return states;
 }
 
+/** Create a default board for a project that has none yet, return its state. */
+export async function createDefaultBoardForProject(projectId: string): Promise<BoardState> {
+  const db: IDatabase = await getDb();
+  const project = await db.getProject(projectId);
+  if (!project) throw new Error('Project not found');
+  const row = await db.createBoard(randomUUID(), 'Main Board', projectId);
+  const state = await getFullBoardState(row.id);
+  if (!state) throw new Error('Failed to load board state');
+  return state;
+}
+
 // ─── Release queries ─────────────────────────────────────
 
 export async function createRelease(input: CreateReleaseInput): Promise<Release> {

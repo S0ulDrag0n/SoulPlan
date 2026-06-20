@@ -20,6 +20,7 @@ type SSEClient = {
   controller: ReadableStreamDefaultController;
   projectId: string;
   memberId: string;
+  memberName: string;
 };
 
 class EventBus {
@@ -30,16 +31,17 @@ class EventBus {
     id: string,
     projectId: string,
     memberId: string,
+    memberName: string,
     controller: ReadableStreamDefaultController
   ): () => void {
-    const client: SSEClient = { id, controller, projectId, memberId };
+    const client: SSEClient = { id, controller, projectId, memberId, memberName };
     this.clients.set(id, client);
 
     // Broadcast a presence:join event to other clients on the same project
     this.broadcast(projectId, {
       type: 'presence',
       memberId,
-      memberName: memberId, // name will be enriched by the caller
+      memberName,
       action: 'join',
     }, id); // exclude sender
 
@@ -49,7 +51,7 @@ class EventBus {
       this.broadcast(projectId, {
         type: 'presence',
         memberId,
-        memberName: memberId,
+        memberName,
         action: 'leave',
       });
     };
@@ -70,12 +72,12 @@ class EventBus {
     }
   }
 
-  /** Get all connected member IDs for a project (for presence). */
-  getPresence(projectId: string): { memberId: string }[] {
-    const result: { memberId: string }[] = [];
+  /** Get all connected members for a project (for presence). */
+  getPresence(projectId: string): { memberId: string; memberName: string }[] {
+    const result: { memberId: string; memberName: string }[] = [];
     for (const client of this.clients.values()) {
       if (client.projectId === projectId) {
-        result.push({ memberId: client.memberId });
+        result.push({ memberId: client.memberId, memberName: client.memberName });
       }
     }
     return result;

@@ -17,9 +17,12 @@ import PanCanvas from '@/components/PanCanvas';
 import ThemeToggle from '@/components/ThemeToggle';
 import AuthForm from '@/components/AuthForm';
 import ProjectSwitcher from '@/components/ProjectSwitcher';
+import CursorOverlay from '@/components/CursorOverlay';
+import PresenceBar from '@/components/PresenceBar';
 import { useAuth } from '@/components/AuthProvider';
 import { useBoard } from '@/hooks/useBoard';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
+import { useRealtime } from '@/hooks/useRealtime';
 import { findTaskById, resolveDropTarget } from '@/lib/transform';
 import type { Task, Release, Sprint, StickyNote as StickyNoteModel, NoteConnectionTargetType, Project } from '@/lib/types';
 import * as api from '@/lib/api';
@@ -37,6 +40,7 @@ export default function Home() {
   // default board still works. Auth is required only for creating projects.
   const { boardState, setBoardState, loading, error, reload } = useBoard(selectedProjectId ?? undefined);
   const { saving, error: mutationError, moveTask, createTask, saveTask, deleteTask, reorderTasks } = useTaskMutations(boardState, reload, setBoardState);
+  const { cursors, presence, sendCursor } = useRealtime(selectedProjectId, session);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingRelease, setEditingRelease] = useState<Release | null>(null);
@@ -163,6 +167,14 @@ export default function Home() {
     // Clear boardState so useBoard reloads for the new project
     setBoardState(null);
   }, [setBoardState]);
+
+  // ─── Cursor tracking for realtime ──────────────────────────
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!session || !selectedProjectId) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    // Compute position relative to the board container (pan-space approx)
+    sendCursor(e.clientX - rect.left, e.clientY - rect.top);
+  }, [session, selectedProjectId, sendCursor]);
 
   const handleAddTask = useCallback(async (sprintId: string) => {
     await createTask(sprintId, 'New Task');
@@ -364,6 +376,9 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-3">
           {saving ? <span className="text-sm text-gray-400 dark:text-gray-500">Saving...</span> : null}
+          {session && selectedProjectId ? (
+            <PresenceBar presence={presence} selfMemberId={session.memberId} />
+          ) : null}
           {session ? (
             <span className="text-sm text-gray-500 dark:text-gray-400">{session.displayName}</span>
           ) : (
@@ -408,7 +423,7 @@ export default function Home() {
             onDragEnd={handleDragEndAndRefresh}
           >
             <PanCanvas className="flex-1">
-              <div ref={boardContainerRef} className="relative p-8">
+              <div ref={boardContainerRef} className="relative p-8" onMouseMove={handleMouseMove}>
                 <div className="relative flex gap-6 min-h-[400px]">
                   <DependencyLines
                     dependencies={allDependencies}
@@ -450,6 +465,11 @@ export default function Home() {
                   onDelete={handleDeleteSticky}
                   onColorCycle={handleColorCycleSticky}
                 />
+
+                {/* Realtime remote cursors overlay */}
+                {session && selectedProjectId ? (
+                  <CursorOverlay cursors={cursors} selfMemberId={session.memberId} />
+                ) : null}
               </div>
             </PanCanvas>
 

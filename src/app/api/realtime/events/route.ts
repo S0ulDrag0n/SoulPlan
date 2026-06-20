@@ -19,7 +19,14 @@ export async function GET(req: NextRequest) {
   }
 
   // Authenticate — only logged-in users/guests can connect to realtime
-  const session = await authenticate(req);
+  // EventSource can't send custom headers, so accept token as query param too
+  const token = searchParams.get('token');
+  let session = await authenticate(req);
+  if (!session && token) {
+    // Try token from query param
+    const { getSessionByToken } = await import('@/lib/queries');
+    session = await getSessionByToken(token);
+  }
   if (!session) {
     return new Response(JSON.stringify({ error: 'Authentication required' }), {
       status: 401,
@@ -30,11 +37,12 @@ export async function GET(req: NextRequest) {
   const bus = getEventBus();
   const clientId = randomUUID();
   const memberId = session.memberId;
+  const memberName = session.displayName;
 
   const stream = new ReadableStream({
     start(controller) {
       // Register this client with the EventBus
-      const disconnect = bus.connect(clientId, projectId, memberId, controller);
+      const disconnect = bus.connect(clientId, projectId, memberId, memberName, controller);
 
       // Send an initial comment to establish the connection
       controller.enqueue(': connected\n\n');

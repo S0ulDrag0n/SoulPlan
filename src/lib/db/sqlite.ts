@@ -40,15 +40,51 @@ async function initialize(): Promise<SqlJsDatabase> {
   }
 
   db.run('PRAGMA foreign_keys = ON');
-  migrate(db);
-  migrateV2(db);
-  migrateV3(db);
-  migrateV4(db);
-  migrateV5(db);
-  migrateV6(db);
-  migrateV7(db);
-  migrateV8(db);
+  runMigrations(db);
   return db;
+}
+
+// ─── Versioned migration runner ───────────────────────────
+// Each migration is gated by a version number stored in schema_migrations.
+// Only migrations that haven't been applied yet will run, and each is
+// recorded as applied in a single transaction. Existing DBs that predate
+// the versioning system will have all current migrations applied on the
+// first run (they're idempotent, so no-op) and then tracked from there.
+
+const MIGRATIONS: { version: number; fn: (db: SqlJsDatabase) => void }[] = [
+  { version: 1, fn: migrate },
+  { version: 2, fn: migrateV2 },
+  { version: 3, fn: migrateV3 },
+  { version: 4, fn: migrateV4 },
+  { version: 5, fn: migrateV5 },
+  { version: 6, fn: migrateV6 },
+  { version: 7, fn: migrateV7 },
+  { version: 8, fn: migrateV8 },
+];
+
+function runMigrations(db: SqlJsDatabase): void {
+  // Create the tracking table if it doesn't exist yet.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version INTEGER PRIMARY KEY,
+      applied_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  // Collect already-applied versions.
+  const applied = new Set<number>();
+  const rows = getAll(db, 'SELECT version FROM schema_migrations');
+  for (const row of rows) {
+    applied.add(row.version as number);
+  }
+
+  // Run any migration whose version hasn't been recorded yet.
+  for (const { version, fn } of MIGRATIONS) {
+    if (applied.has(version)) continue;
+    fn(db);
+    db.run('INSERT INTO schema_migrations (version) VALUES (?)', [version]);
+    saveToDisk(db);
+  }
 }
 
 function migrate(db: SqlJsDatabase): void {

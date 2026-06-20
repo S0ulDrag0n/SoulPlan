@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { DndContext, DragOverlay, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
@@ -34,6 +34,21 @@ type StickyColor = (typeof STICKY_COLORS)[number];
 export default function Home() {
   const { session, loading: authLoading } = useAuth();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
+  // Restore last-used project from localStorage on mount.
+  useEffect(() => {
+    const saved = localStorage.getItem('soulplan-selected-project');
+    if (saved) setSelectedProjectId(saved);
+  }, []);
+
+  // Persist selected project whenever it changes.
+  useEffect(() => {
+    if (selectedProjectId) {
+      localStorage.setItem('soulplan-selected-project', selectedProjectId);
+    } else {
+      localStorage.removeItem('soulplan-selected-project');
+    }
+  }, [selectedProjectId]);
 
   // Show auth form if not logged in (but allow guest browsing — if no auth
   // requirement is desired for read-only, this gate can be relaxed later).

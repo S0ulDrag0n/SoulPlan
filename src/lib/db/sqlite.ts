@@ -46,6 +46,7 @@ async function initialize(): Promise<SqlJsDatabase> {
   migrateV4(db);
   migrateV5(db);
   migrateV6(db);
+  migrateV7(db);
   return db;
 }
 
@@ -244,6 +245,15 @@ function migrateV6(db: SqlJsDatabase): void {
   `);
 }
 
+function migrateV7(db: SqlJsDatabase): void {
+  // Add is_archived column to projects (soft-delete / archive support).
+  const projectCols = getAll(db, "PRAGMA table_info(projects)");
+  const projectColNames = projectCols.map((r) => r.name as string);
+  if (!projectColNames.includes('is_archived')) {
+    db.run("ALTER TABLE projects ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0");
+  }
+}
+
 function saveToDisk(db: SqlJsDatabase): void {
   const data = db.export();
   const buffer = Buffer.from(data);
@@ -329,8 +339,15 @@ class SqlJsDataAdapter implements IDatabase {
     return row as unknown as ProjectRow | undefined;
   }
 
-  async getAllProjects(): Promise<ProjectRow[]> {
-    return getAll(this.db, 'SELECT * FROM projects ORDER BY created_at') as unknown as ProjectRow[];
+  async getAllProjects(includeArchived: boolean = false): Promise<ProjectRow[]> {
+    const sql = includeArchived
+      ? 'SELECT * FROM projects ORDER BY created_at'
+      : 'SELECT * FROM projects WHERE is_archived = 0 ORDER BY created_at';
+    return getAll(this.db, sql) as unknown as ProjectRow[];
+  }
+
+  async getArchivedProjects(): Promise<ProjectRow[]> {
+    return getAll(this.db, 'SELECT * FROM projects WHERE is_archived = 1 ORDER BY created_at') as unknown as ProjectRow[];
   }
 
   async createProject(id: string, name: string, ownerId: string | null = null): Promise<ProjectRow> {
@@ -407,12 +424,13 @@ class SqlJsDataAdapter implements IDatabase {
     ) as unknown as ProjectMemberRow[];
   }
 
-  async getProjectsByMemberId(memberId: string): Promise<ProjectRow[]> {
+  async getProjectsByMemberId(memberId: string, includeArchived: boolean = false): Promise<ProjectRow[]> {
+    const archFilter = includeArchived ? '' : 'AND p.is_archived = 0';
     return getAll(
       this.db,
       `SELECT p.* FROM projects p
        INNER JOIN project_members pm ON pm.project_id = p.id
-       WHERE pm.member_id = ?
+       WHERE pm.member_id = ? ${archFilter}
        ORDER BY p.created_at`,
       [memberId]
     ) as unknown as ProjectRow[];

@@ -25,7 +25,8 @@ export interface IDatabase {
 
   // ─── Projects ─────────────────────────────────────────────
   getProject(id: string): Promise<ProjectRow | undefined>;
-  getAllProjects(): Promise<ProjectRow[]>;
+  getAllProjects(includeArchived?: boolean): Promise<ProjectRow[]>;
+  getArchivedProjects(): Promise<ProjectRow[]>;
   createProject(id: string, name: string, ownerId?: string | null): Promise<ProjectRow>;
   updateProject(id: string, fields: Record<string, unknown>): Promise<void>;
   deleteProject(id: string): Promise<void>;
@@ -41,7 +42,7 @@ export interface IDatabase {
 
   // ─── Project Members ──────────────────────────────────────
   getProjectMembers(projectId: string): Promise<ProjectMemberRow[]>;
-  getProjectsByMemberId(memberId: string): Promise<ProjectRow[]>;
+  getProjectsByMemberId(memberId: string, includeArchived?: boolean): Promise<ProjectRow[]>;
   addProjectMember(id: string, projectId: string, memberType: MemberType, memberId: string, role: MemberRole): Promise<ProjectMemberRow>;
   removeProjectMember(id: string): Promise<void>;
   findProjectMember(projectId: string, memberId: string): Promise<ProjectMemberRow | undefined>;

@@ -184,11 +184,29 @@ export function createProject(input: CreateProjectInput): Promise<Project> {
   });
 }
 
-export function updateProject(id: string, input: { name?: string }): Promise<{ success: boolean }> {
+export function updateProject(id: string, input: { name?: string; isArchived?: boolean }): Promise<{ success: boolean }> {
   return request<{ success: boolean }>(`/projects/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(input),
   });
+}
+
+export function archiveProject(id: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/projects/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isArchived: true }),
+  });
+}
+
+export function unarchiveProject(id: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/projects/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isArchived: false }),
+  });
+}
+
+export function fetchArchivedProjects(): Promise<Project[]> {
+  return request<Project[]>('/projects?archived=true');
 }
 
 export function deleteProject(id: string): Promise<{ success: boolean }> {

@@ -249,6 +249,12 @@ export async function getProjects(): Promise<Project[]> {
   return rows.map(toProject);
 }
 
+export async function getArchivedProjects(): Promise<Project[]> {
+  const db: IDatabase = await getDb();
+  const rows = await db.getArchivedProjects();
+  return rows.map(toProject);
+}
+
 export async function getProject(id: string): Promise<Project | null> {
   const db: IDatabase = await getDb();
   const row = await db.getProject(id);
@@ -269,6 +275,7 @@ export async function updateProject(input: UpdateProjectInput): Promise<void> {
   const db: IDatabase = await getDb();
   const fields: Record<string, unknown> = {};
   if (input.name !== undefined) fields.name = input.name;
+  if (input.isArchived !== undefined) fields.is_archived = input.isArchived ? 1 : 0;
   await db.updateProject(input.id, fields);
 }
 

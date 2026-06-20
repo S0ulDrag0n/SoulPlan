@@ -15,6 +15,7 @@ export interface Project {
   id: string;
   name: string;
   ownerId: string | null;
+  isArchived: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -226,6 +227,7 @@ export interface CreateProjectInput {
 export interface UpdateProjectInput {
   id: string;
   name?: string;
+  isArchived?: boolean;
 }
 
 /** Input shape for user registration. */

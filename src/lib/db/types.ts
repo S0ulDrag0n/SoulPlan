@@ -14,6 +14,7 @@ export interface ProjectRow {
   id: string;
   name: string;
   owner_id: string | null; // FK to users.id (nullable for migration period)
+  is_archived: number; // SQLite boolean 0|1
   created_at: string;
   updated_at: string;
 }

@@ -19,7 +19,7 @@ export async function GET(
   }
 }
 
-// PATCH /api/projects/[id] — update a project
+// PATCH /api/projects/[id] — update a project (name, archive/unarchive)
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -29,6 +29,9 @@ export async function PATCH(
     const body = await req.json();
     if (body.name !== undefined && typeof body.name !== 'string') {
       return NextResponse.json({ error: 'name must be a string' }, { status: 400 });
+    }
+    if (body.isArchived !== undefined && typeof body.isArchived !== 'boolean') {
+      return NextResponse.json({ error: 'isArchived must be a boolean' }, { status: 400 });
     }
     await q.updateProject({ id, ...body });
     return NextResponse.json({ success: true });

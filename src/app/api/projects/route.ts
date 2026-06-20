@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as q from '@/lib/queries';
 import { requireUser, AuthError } from '@/lib/auth';
 
-// GET /api/projects — list all projects (public for now, could filter by member)
-export async function GET() {
+// GET /api/projects — list projects. ?archived=true shows archived projects.
+export async function GET(req: NextRequest) {
   try {
-    const projects = await q.getProjects();
+    const url = new URL(req.url);
+    const archived = url.searchParams.get('archived') === 'true';
+    const projects = archived
+      ? await q.getArchivedProjects()
+      : await q.getProjects();
     return NextResponse.json(projects);
   } catch (error) {
     console.error('GET /api/projects error:', error);

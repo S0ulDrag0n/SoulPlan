@@ -27,6 +27,7 @@ export function toProject(row: ProjectRow): Project {
     id: row.id,
     name: row.name,
     ownerId: row.owner_id,
+    isArchived: row.is_archived === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

@@ -162,8 +162,8 @@ export default function Home() {
     reload();
   }, [reload]);
 
-  const handleSelectProject = useCallback((project: Project) => {
-    setSelectedProjectId(project.id);
+  const handleSelectProject = useCallback((project: Project | null) => {
+    setSelectedProjectId(project?.id ?? null);
     // Clear boardState so useBoard reloads for the new project
     setBoardState(null);
   }, [setBoardState]);

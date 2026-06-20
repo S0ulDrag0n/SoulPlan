@@ -5,13 +5,26 @@ import type {
   CreateStickyNoteInput, UpdateStickyNoteInput,
   CreateNoteConnectionInput,
   Task, Dependency, StickyNote, NoteConnection,
+  Project, Session, ProjectMember,
+  CreateProjectInput, RegisterInput, LoginInput, JoinAsGuestInput,
+  MemberType, MemberRole,
 } from '@/lib/types';
 
 const BASE = '/api';
 
+function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('soulplan-session-token');
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...options?.headers },
     ...options,
   });
   if (!res.ok) {
@@ -23,8 +36,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 // ─── Board ─────────────────────────────────────────────────
 
-export function fetchBoard(): Promise<BoardState> {
-  return request<BoardState>('/board');
+export function fetchBoard(boardId?: string): Promise<BoardState> {
+  const qs = boardId ? `?boardId=${encodeURIComponent(boardId)}` : '';
+  return request<BoardState>(`/board${qs}`);
 }
 
 // ─── Releases ─────────────────────────────────────────────
@@ -151,4 +165,89 @@ export function deleteNoteConnection(id: string): Promise<{ success: boolean }> 
     method: 'DELETE',
     body: JSON.stringify({ id }),
   });
+}
+
+// ─── Projects ─────────────────────────────────────────────
+
+export function fetchProjects(): Promise<Project[]> {
+  return request<Project[]>('/projects');
+}
+
+export function fetchProject(id: string): Promise<Project> {
+  return request<Project>(`/projects/${id}`);
+}
+
+export function createProject(input: CreateProjectInput): Promise<Project> {
+  return request<Project>('/projects', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateProject(id: string, input: { name?: string }): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/projects/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteProject(id: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/projects/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+// ─── Project Members ──────────────────────────────────────
+
+export function fetchProjectMembers(projectId: string): Promise<ProjectMember[]> {
+  return request<ProjectMember[]>(`/projects/${projectId}/members`);
+}
+
+export function addProjectMember(
+  projectId: string,
+  memberType: MemberType,
+  memberId: string,
+  role?: MemberRole
+): Promise<ProjectMember> {
+  return request<ProjectMember>(`/projects/${projectId}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ memberType, memberId, role }),
+  });
+}
+
+export function removeProjectMember(projectId: string, memberRowId: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/projects/${projectId}/members/${memberRowId}`, {
+    method: 'DELETE',
+  });
+}
+
+// ─── Auth ─────────────────────────────────────────────────
+
+export function registerUser(input: RegisterInput): Promise<{ user: { id: string; username: string; displayName: string | null }; session: Session }> {
+  return request('/auth', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'register', ...input }),
+  });
+}
+
+export function loginUser(input: LoginInput): Promise<{ user: { id: string; username: string; displayName: string | null }; session: Session }> {
+  return request('/auth', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'login', ...input }),
+  });
+}
+
+export function joinAsGuest(input: JoinAsGuestInput): Promise<{ guest: { id: string; name: string }; session: Session }> {
+  return request('/auth', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'guest', ...input }),
+  });
+}
+
+export function verifySession(): Promise<{ authenticated: boolean; session?: Session }> {
+  return request('/auth');
+}
+
+export function logout(): Promise<{ success: boolean }> {
+  return request('/auth', { method: 'DELETE' });
 }

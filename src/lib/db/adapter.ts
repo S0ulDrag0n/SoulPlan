@@ -1,7 +1,7 @@
 import type {
   BoardRow, ReleaseRow, SprintRow, TaskRow, DependencyRow,
   StickyNoteRow, NoteConnectionRow, NoteConnectionTargetType,
-  ProjectRow, UserRow, GuestRow, ProjectMemberRow, SessionRow,
+  ProjectRow, UserRow, GuestRow, ProjectMemberRow, ProjectInviteRow, SessionRow,
   MemberType, MemberRole,
 } from './types';
 
@@ -46,6 +46,12 @@ export interface IDatabase {
   addProjectMember(id: string, projectId: string, memberType: MemberType, memberId: string, role: MemberRole): Promise<ProjectMemberRow>;
   removeProjectMember(id: string): Promise<void>;
   findProjectMember(projectId: string, memberId: string): Promise<ProjectMemberRow | undefined>;
+
+  // ─── Project Invites ─────────────────────────────────────
+  createInvite(id: string, projectId: string, token: string, role: MemberRole, expiresAt: string | null): Promise<ProjectInviteRow>;
+  getInviteByToken(token: string): Promise<ProjectInviteRow | undefined>;
+  getInvitesByProjectId(projectId: string): Promise<ProjectInviteRow[]>;
+  deleteInvite(id: string): Promise<void>;
 
   // ─── Sessions ─────────────────────────────────────────────
   createSession(token: string, memberType: MemberType, memberId: string, displayName: string): Promise<SessionRow>;

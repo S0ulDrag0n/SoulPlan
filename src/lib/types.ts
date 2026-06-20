@@ -45,6 +45,16 @@ export interface ProjectMember {
   createdAt: string;
 }
 
+/** Shareable invite link for a project. */
+export interface ProjectInvite {
+  id: string;
+  projectId: string;
+  token: string;
+  role: MemberRole;
+  createdAt: string;
+  expiresAt: string | null;
+}
+
 /** Session info returned by the auth API and stored client-side. */
 export interface Session {
   token: string;

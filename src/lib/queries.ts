@@ -5,7 +5,7 @@ import { getDb } from './db/sqlite';
 import {
   toBoard, toRelease, toSprint, toTask, toDependency,
   toStickyNote, toNoteConnection,
-  toProject, toUser, toGuest, toProjectMember, toSession,
+  toProject, toUser, toGuest, toProjectMember, toProjectInvite, toSession,
   assembleBoardState, taskToRow, sprintToRow, releaseToRow,
   stickyNoteToRow, nextPosition,
 } from './transform';
@@ -17,7 +17,7 @@ import type {
   CreateNoteConnectionInput,
   Task, Release, Sprint, Dependency, StickyNote, NoteConnection,
   NoteConnectionTargetType,
-  Project, User, Guest, ProjectMember, Session,
+  Project, User, Guest, ProjectMember, ProjectInvite, Session,
   MemberType, MemberRole,
   CreateProjectInput, UpdateProjectInput,
   RegisterInput, LoginInput, JoinAsGuestInput,
@@ -398,4 +398,63 @@ export async function addProjectMember(
 export async function removeProjectMember(id: string): Promise<void> {
   const db: IDatabase = await getDb();
   await db.removeProjectMember(id);
+}
+
+// ─── Project invite queries ──────────────────────────────
+
+export async function createInvite(projectId: string, role: MemberRole = 'editor'): Promise<ProjectInvite> {
+  const db: IDatabase = await getDb();
+  const token = generateToken();
+  const row = await db.createInvite(randomUUID(), projectId, token, role, null);
+  return toProjectInvite(row);
+}
+
+export async function getInviteByToken(token: string): Promise<ProjectInvite | null> {
+  const db: IDatabase = await getDb();
+  const row = await db.getInviteByToken(token);
+  return row ? toProjectInvite(row) : null;
+}
+
+export async function getInvitesByProjectId(projectId: string): Promise<ProjectInvite[]> {
+  const db: IDatabase = await getDb();
+  const rows = await db.getInvitesByProjectId(projectId);
+  return rows.map(toProjectInvite);
+}
+
+export async function deleteInvite(id: string): Promise<void> {
+  const db: IDatabase = await getDb();
+  await db.deleteInvite(id);
+}
+
+/**
+ * Accept an invite: create a guest account, add them as a project member,
+ * and return their session. The invite token remains valid for reuse
+ * (multiple people can use the same link).
+ */
+export async function acceptInvite(
+  token: string,
+  guestName: string
+): Promise<{ guest: Guest; session: Session; project: Project; invite: ProjectInvite }> {
+  const db: IDatabase = await getDb();
+  const invite = await getInviteByToken(token);
+  if (!invite) {
+    throw new Error('Invalid or expired invite link');
+  }
+
+  const project = await getProject(invite.projectId);
+  if (!project) {
+    throw new Error('Project not found');
+  }
+
+  // Create guest account
+  const guestRow = await db.createGuest(randomUUID(), guestName);
+  const guest = toGuest(guestRow);
+
+  // Add as project member with the invite's role
+  await db.addProjectMember(randomUUID(), invite.projectId, 'guest', guest.id, invite.role);
+
+  // Create session
+  const session = await createSessionInternal(db, 'guest', guest.id, guest.name);
+
+  return { guest, session, project, invite };
 }

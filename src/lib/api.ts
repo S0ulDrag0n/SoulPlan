@@ -5,7 +5,7 @@ import type {
   CreateStickyNoteInput, UpdateStickyNoteInput,
   CreateNoteConnectionInput,
   Task, Dependency, StickyNote, NoteConnection,
-  Project, Session, ProjectMember,
+  Project, Session, ProjectMember, ProjectInvite,
   CreateProjectInput, RegisterInput, LoginInput, JoinAsGuestInput,
   MemberType, MemberRole,
 } from '@/lib/types';
@@ -236,6 +236,44 @@ export function addProjectMember(
 export function removeProjectMember(projectId: string, memberRowId: string): Promise<{ success: boolean }> {
   return request<{ success: boolean }>(`/projects/${projectId}/members/${memberRowId}`, {
     method: 'DELETE',
+  });
+}
+
+// ─── Project Invites ──────────────────────────────────────
+
+export function fetchProjectInvites(projectId: string): Promise<ProjectInvite[]> {
+  return request<ProjectInvite[]>(`/projects/${projectId}/invites`);
+}
+
+export function createProjectInvite(projectId: string, role?: MemberRole): Promise<ProjectInvite> {
+  return request<ProjectInvite>(`/projects/${projectId}/invites`, {
+    method: 'POST',
+    body: JSON.stringify({ role: role ?? 'editor' }),
+  });
+}
+
+export function revokeProjectInvite(projectId: string, inviteId: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/projects/${projectId}/invites`, {
+    method: 'DELETE',
+    body: JSON.stringify({ inviteId }),
+  });
+}
+
+/** Preview an invite without accepting — returns project name + role. */
+export function previewInvite(token: string): Promise<{ projectName: string; role: MemberRole; projectId: string }> {
+  return request(`/invites/accept?token=${encodeURIComponent(token)}`);
+}
+
+/** Accept an invite: creates a guest account, adds them to the project, returns session. */
+export function acceptInvite(token: string, name: string): Promise<{
+  guest: { id: string; name: string; createdAt: string };
+  session: Session;
+  project: Project;
+  invite: ProjectInvite;
+}> {
+  return request('/invites/accept', {
+    method: 'POST',
+    body: JSON.stringify({ token, name }),
   });
 }
 

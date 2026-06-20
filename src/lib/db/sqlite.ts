@@ -5,7 +5,7 @@ import type { IDatabase } from './adapter';
 import type {
   BoardRow, ReleaseRow, SprintRow, TaskRow, DependencyRow,
   StickyNoteRow, NoteConnectionRow, NoteConnectionTargetType,
-  ProjectRow, UserRow, GuestRow, ProjectMemberRow, SessionRow,
+  ProjectRow, UserRow, GuestRow, ProjectMemberRow, ProjectInviteRow, SessionRow,
   MemberType, MemberRole,
 } from './types';
 
@@ -47,6 +47,7 @@ async function initialize(): Promise<SqlJsDatabase> {
   migrateV5(db);
   migrateV6(db);
   migrateV7(db);
+  migrateV8(db);
   return db;
 }
 
@@ -254,6 +255,27 @@ function migrateV7(db: SqlJsDatabase): void {
   }
 }
 
+function migrateV8(db: SqlJsDatabase): void {
+  // Project invites — shareable tokens that let guests join a project.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS project_invites (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      role TEXT NOT NULL DEFAULT 'editor' CHECK (role IN ('owner', 'editor', 'viewer')),
+      created_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+  `);
+
+  try {
+    db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_project_invite_token ON project_invites(token)');
+  } catch {
+    // Index may already exist
+  }
+}
+
 function saveToDisk(db: SqlJsDatabase): void {
   const data = db.export();
   const buffer = Buffer.from(data);
@@ -458,6 +480,32 @@ class SqlJsDataAdapter implements IDatabase {
       [projectId, memberId]
     );
     return row as unknown as ProjectMemberRow | undefined;
+  }
+
+  // ─── Project Invites ─────────────────────────────────────
+
+  async createInvite(id: string, projectId: string, token: string, role: MemberRole, expiresAt: string | null): Promise<ProjectInviteRow> {
+    this.db.run(
+      'INSERT INTO project_invites (id, project_id, token, role, expires_at) VALUES (?, ?, ?, ?, ?)',
+      [id, projectId, token, role, expiresAt]
+    );
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM project_invites WHERE id = ?', [id]);
+    return row as unknown as ProjectInviteRow;
+  }
+
+  async getInviteByToken(token: string): Promise<ProjectInviteRow | undefined> {
+    const row = getOne(this.db, 'SELECT * FROM project_invites WHERE token = ?', [token]);
+    return row as unknown as ProjectInviteRow | undefined;
+  }
+
+  async getInvitesByProjectId(projectId: string): Promise<ProjectInviteRow[]> {
+    return getAll(this.db, 'SELECT * FROM project_invites WHERE project_id = ? ORDER BY created_at', [projectId]) as unknown as ProjectInviteRow[];
+  }
+
+  async deleteInvite(id: string): Promise<void> {
+    this.db.run('DELETE FROM project_invites WHERE id = ?', [id]);
+    saveToDisk(this.db);
   }
 
   // ─── Sessions ─────────────────────────────────────────────

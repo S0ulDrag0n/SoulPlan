@@ -45,6 +45,15 @@ export interface ProjectMemberRow {
   created_at: string;
 }
 
+export interface ProjectInviteRow {
+  id: string;
+  project_id: string;
+  token: string;
+  role: MemberRole;
+  created_at: string;
+  expires_at: string | null;
+}
+
 export interface SessionRow {
   token: string;
   member_type: MemberType;

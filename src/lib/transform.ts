@@ -1,13 +1,13 @@
 import type {
   BoardRow, ReleaseRow, SprintRow, TaskRow, DependencyRow,
   StickyNoteRow, NoteConnectionRow,
-  ProjectRow, UserRow, GuestRow, ProjectMemberRow, SessionRow,
+  ProjectRow, UserRow, GuestRow, ProjectMemberRow, ProjectInviteRow, SessionRow,
 } from './db/types';
 import type {
   Board, Release, Sprint, Task, Dependency, BoardState,
   StickyNote, NoteConnection,
   SprintWithTasks,
-  Project, User, Guest, ProjectMember, Session,
+  Project, User, Guest, ProjectMember, ProjectInvite, Session,
 } from './types';
 
 // ─── Row → Model transforms (pure functions) ────────────────
@@ -58,6 +58,17 @@ export function toProjectMember(row: ProjectMemberRow): ProjectMember {
     memberId: row.member_id,
     role: row.role,
     createdAt: row.created_at,
+  };
+}
+
+export function toProjectInvite(row: ProjectInviteRow): ProjectInvite {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    token: row.token,
+    role: row.role,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
   };
 }
 

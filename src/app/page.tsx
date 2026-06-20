@@ -17,6 +17,7 @@ import PanCanvas from '@/components/PanCanvas';
 import ThemeToggle from '@/components/ThemeToggle';
 import AuthForm from '@/components/AuthForm';
 import ProjectSwitcher from '@/components/ProjectSwitcher';
+import ShareDialog from '@/components/ShareDialog';
 import CursorOverlay from '@/components/CursorOverlay';
 import PresenceBar from '@/components/PresenceBar';
 import { useAuth } from '@/components/AuthProvider';
@@ -46,6 +47,7 @@ export default function Home() {
   const [editingRelease, setEditingRelease] = useState<Release | null>(null);
   const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
   const [showAuthForm, setShowAuthForm] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
 
   // Ref to always-read-latest boardState in async DnD handlers
   const boardStateRef = useRef(boardState);
@@ -379,6 +381,15 @@ export default function Home() {
           {session && selectedProjectId ? (
             <PresenceBar presence={presence} selfMemberId={session.memberId} />
           ) : null}
+          {session && selectedProjectId ? (
+            <button
+              onClick={() => setShowShareDialog(true)}
+              className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1"
+              title="Share this project"
+            >
+              <span>🔗</span> Share
+            </button>
+          ) : null}
           {session ? (
             <span className="text-sm text-gray-500 dark:text-gray-400">{session.displayName}</span>
           ) : (
@@ -512,6 +523,14 @@ export default function Home() {
             <AuthForm />
           </div>
         </div>
+      ) : null}
+
+      {/* Share dialog */}
+      {showShareDialog && selectedProjectId ? (
+        <ShareDialog
+          projectId={selectedProjectId}
+          onClose={() => setShowShareDialog(false)}
+        />
       ) : null}
     </div>
   );

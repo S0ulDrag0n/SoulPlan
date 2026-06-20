@@ -20,6 +20,7 @@ import type { BoardState } from '../../types';
 const boardRow: BoardRow = {
   id: 'b1',
   name: 'Test Board',
+  project_id: null,
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
 };
@@ -72,6 +73,7 @@ describe('toBoard', () => {
     expect(result).toEqual({
       id: 'b1',
       name: 'Test Board',
+      projectId: null,
       createdAt: '2025-01-01T00:00:00Z',
       updatedAt: '2025-01-01T00:00:00Z',
     });
@@ -187,7 +189,7 @@ describe('assembleBoardState', () => {
 describe('moveTaskBetweenSprints', () => {
   it('moves a task from one sprint to another', () => {
     const state: BoardState = {
-      board: { id: 'b1', name: 'Board', createdAt: '', updatedAt: '' },
+      board: { id: 'b1', name: 'Board', projectId: null, createdAt: '', updatedAt: '' },
       releases: [{
         id: 'r1', boardId: 'b1', name: 'R1', position: 0, targetDate: null, notes: null, createdAt: '',
         sprints: [
@@ -204,6 +206,8 @@ describe('moveTaskBetweenSprints', () => {
         ],
       }],
       dependencies: [],
+      stickyNotes: [],
+      noteConnections: [],
     };
 
     const result = moveTaskBetweenSprints(state, 't1', 's2');
@@ -214,7 +218,7 @@ describe('moveTaskBetweenSprints', () => {
 
   it('returns same state when source === target', () => {
     const state: BoardState = {
-      board: { id: 'b1', name: 'Board', createdAt: '', updatedAt: '' },
+      board: { id: 'b1', name: 'Board', projectId: null, createdAt: '', updatedAt: '' },
       releases: [{
         id: 'r1', boardId: 'b1', name: 'R1', position: 0, targetDate: null, notes: null, createdAt: '',
         sprints: [
@@ -227,6 +231,8 @@ describe('moveTaskBetweenSprints', () => {
         ],
       }],
       dependencies: [],
+      stickyNotes: [],
+      noteConnections: [],
     };
 
     const result = moveTaskBetweenSprints(state, 't1', 's1');
@@ -238,7 +244,7 @@ describe('moveTaskBetweenSprints', () => {
 describe('findTaskById', () => {
   it('finds a task in the nested board state', () => {
     const state: BoardState = {
-      board: { id: 'b1', name: 'Board', createdAt: '', updatedAt: '' },
+      board: { id: 'b1', name: 'Board', projectId: null, createdAt: '', updatedAt: '' },
       releases: [{
         id: 'r1', boardId: 'b1', name: 'R1', position: 0, targetDate: null, notes: null, createdAt: '',
         sprints: [{
@@ -250,6 +256,8 @@ describe('findTaskById', () => {
         }],
       }],
       dependencies: [],
+      stickyNotes: [],
+      noteConnections: [],
     };
 
     expect(findTaskById(state, 't2')?.title).toBe('Task 2');
@@ -260,7 +268,7 @@ describe('findTaskById', () => {
 describe('resolveDropTarget', () => {
   it('resolves sprint ID when dropped directly on a sprint', () => {
     const state: BoardState = {
-      board: { id: 'b1', name: 'Board', createdAt: '', updatedAt: '' },
+      board: { id: 'b1', name: 'Board', projectId: null, createdAt: '', updatedAt: '' },
       releases: [{
         id: 'r1', boardId: 'b1', name: 'R1', position: 0, targetDate: null, notes: null, createdAt: '',
         sprints: [{
@@ -269,10 +277,12 @@ describe('resolveDropTarget', () => {
         }],
       }],
       dependencies: [],
+      stickyNotes: [],
+      noteConnections: [],
     };
 
-    expect(resolveDropTarget(state, 's1')).toBe('s1');
-    expect(resolveDropTarget(state, 't1')).toBe('s1'); // dropped on task → find its sprint
+    expect(resolveDropTarget(state, 's1')).toEqual({ sprintId: 's1', insertIndex: 1 });
+    expect(resolveDropTarget(state, 't1')).toEqual({ sprintId: 's1', insertIndex: 0 }); // dropped on task → insert before it
     expect(resolveDropTarget(state, 'unknown')).toBeUndefined();
   });
 });

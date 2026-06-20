@@ -1,11 +1,13 @@
 import type {
   BoardRow, ReleaseRow, SprintRow, TaskRow, DependencyRow,
   StickyNoteRow, NoteConnectionRow,
+  ProjectRow, UserRow, GuestRow, ProjectMemberRow, SessionRow,
 } from './db/types';
 import type {
   Board, Release, Sprint, Task, Dependency, BoardState,
   StickyNote, NoteConnection,
   SprintWithTasks,
+  Project, User, Guest, ProjectMember, Session,
 } from './types';
 
 // ─── Row → Model transforms (pure functions) ────────────────
@@ -14,8 +16,56 @@ export function toBoard(row: BoardRow): Board {
   return {
     id: row.id,
     name: row.name,
+    projectId: row.project_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export function toProject(row: ProjectRow): Project {
+  return {
+    id: row.id,
+    name: row.name,
+    ownerId: row.owner_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function toUser(row: UserRow): User {
+  return {
+    id: row.id,
+    username: row.username,
+    displayName: row.display_name,
+    createdAt: row.created_at,
+  };
+}
+
+export function toGuest(row: GuestRow): Guest {
+  return {
+    id: row.id,
+    name: row.name,
+    createdAt: row.created_at,
+  };
+}
+
+export function toProjectMember(row: ProjectMemberRow): ProjectMember {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    memberType: row.member_type,
+    memberId: row.member_id,
+    role: row.role,
+    createdAt: row.created_at,
+  };
+}
+
+export function toSession(row: SessionRow): Session {
+  return {
+    token: row.token,
+    memberType: row.member_type,
+    memberId: row.member_id,
+    displayName: row.display_name,
   };
 }
 

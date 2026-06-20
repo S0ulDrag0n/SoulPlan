@@ -5,8 +5,51 @@
 export interface BoardRow {
   id: string;
   name: string;
+  project_id: string | null; // V5 — nullable for migration period
   created_at: string;
   updated_at: string;
+}
+
+export interface ProjectRow {
+  id: string;
+  name: string;
+  owner_id: string | null; // FK to users.id (nullable for migration period)
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserRow {
+  id: string;
+  username: string;
+  password_hash: string;
+  display_name: string | null;
+  created_at: string;
+}
+
+export interface GuestRow {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export type MemberType = 'user' | 'guest';
+export type MemberRole = 'owner' | 'editor' | 'viewer';
+
+export interface ProjectMemberRow {
+  id: string;
+  project_id: string;
+  member_type: MemberType;
+  member_id: string;
+  role: MemberRole;
+  created_at: string;
+}
+
+export interface SessionRow {
+  token: string;
+  member_type: MemberType;
+  member_id: string;
+  display_name: string;
+  created_at: string;
 }
 
 export interface ReleaseRow {

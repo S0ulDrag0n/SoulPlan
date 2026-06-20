@@ -15,22 +15,33 @@ import NoteConnectionLines from '@/components/NoteConnectionLines';
 import { NoteConnectorProvider, useNoteConnector } from '@/components/NoteConnector';
 import PanCanvas from '@/components/PanCanvas';
 import ThemeToggle from '@/components/ThemeToggle';
+import AuthForm from '@/components/AuthForm';
+import ProjectSwitcher from '@/components/ProjectSwitcher';
+import { useAuth } from '@/components/AuthProvider';
 import { useBoard } from '@/hooks/useBoard';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
 import { findTaskById, resolveDropTarget } from '@/lib/transform';
-import type { Task, Release, Sprint, StickyNote as StickyNoteModel, NoteConnectionTargetType } from '@/lib/types';
+import type { Task, Release, Sprint, StickyNote as StickyNoteModel, NoteConnectionTargetType, Project } from '@/lib/types';
 import * as api from '@/lib/api';
 
 const STICKY_COLORS = ['yellow', 'pink', 'blue', 'green', 'purple'] as const;
 type StickyColor = (typeof STICKY_COLORS)[number];
 
 export default function Home() {
-  const { boardState, setBoardState, loading, error, reload } = useBoard();
+  const { session, loading: authLoading } = useAuth();
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
+  // Show auth form if not logged in (but allow guest browsing — if no auth
+  // requirement is desired for read-only, this gate can be relaxed later).
+  // For now, allow unauthenticated access to keep backward compat — the
+  // default board still works. Auth is required only for creating projects.
+  const { boardState, setBoardState, loading, error, reload } = useBoard(selectedProjectId ?? undefined);
   const { saving, error: mutationError, moveTask, createTask, saveTask, deleteTask, reorderTasks } = useTaskMutations(boardState, reload, setBoardState);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingRelease, setEditingRelease] = useState<Release | null>(null);
   const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
+  const [showAuthForm, setShowAuthForm] = useState(false);
 
   // Ref to always-read-latest boardState in async DnD handlers
   const boardStateRef = useRef(boardState);
@@ -146,6 +157,12 @@ export default function Home() {
     await api.createSprint({ releaseId, name: `Sprint ${(release?.sprints.length ?? 0) + 1}` });
     reload();
   }, [reload]);
+
+  const handleSelectProject = useCallback((project: Project) => {
+    setSelectedProjectId(project.id);
+    // Clear boardState so useBoard reloads for the new project
+    setBoardState(null);
+  }, [setBoardState]);
 
   const handleAddTask = useCallback(async (sprintId: string) => {
     await createTask(sprintId, 'New Task');
@@ -341,9 +358,22 @@ export default function Home() {
       ) : null}
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between shrink-0">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{boardState.board.name}</h1>
+        <div className="flex items-center gap-4">
+          <ProjectSwitcher currentProjectId={selectedProjectId} onSelectProject={handleSelectProject} />
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{boardState.board.name}</h1>
+        </div>
         <div className="flex items-center gap-3">
           {saving ? <span className="text-sm text-gray-400 dark:text-gray-500">Saving...</span> : null}
+          {session ? (
+            <span className="text-sm text-gray-500 dark:text-gray-400">{session.displayName}</span>
+          ) : (
+            <button
+              onClick={() => setShowAuthForm(true)}
+              className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            >
+              Login / Register
+            </button>
+          )}
           <ThemeToggle />
           <button
             onClick={handleAddSticky}
@@ -453,6 +483,15 @@ export default function Home() {
           onSave={handleEditSprint}
           onClose={() => setEditingSprint(null)}
         />
+      ) : null}
+
+      {/* Auth form modal */}
+      {showAuthForm && !session ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowAuthForm(false)}>
+          <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <AuthForm />
+          </div>
+        </div>
       ) : null}
     </div>
   );

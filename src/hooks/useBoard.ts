@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { BoardState } from '@/lib/types';
 import { fetchBoard } from '@/lib/api';
 
-export function useBoard() {
+export function useBoard(boardId?: string) {
   const [boardState, setBoardState] = useState<BoardState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,16 +16,16 @@ export function useBoard() {
       // so we silently refresh without the flash.
       if (!boardState) setLoading(true);
       setError(null);
-      const data = await fetchBoard();
+      const data = await fetchBoard(boardId);
       setBoardState(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load board');
     } finally {
       setLoading(false);
     }
-  }, [boardState]);
+  }, [boardState, boardId]);
 
-  useEffect(() => { reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { reload(); }, [boardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { boardState, setBoardState, loading, error, reload };
 }

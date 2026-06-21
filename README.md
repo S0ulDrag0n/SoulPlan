@@ -4,20 +4,29 @@ Open source visual planning software for sprint and release management.
 
 ## Features
 
+- **Multi-project support** — project switcher in the header, archive/restore, delete
+- **User accounts** — register and login with password hashing, or join as a guest
+- **Project sharing** — invite others via reusable token-based share links
+- **Realtime collaboration** — SSE-based live cursors, presence indicators, and automatic board reload on mutations
 - **Visual board** — releases contain sprints, sprints contain tasks, laid out left-to-right
+- **Editable board name** with live stats
+- **Release navigation** — jump-to-release from the header
 - **Drag and drop** — move tasks between sprints by dragging (reassigns instantly)
-- **Dependency lines** — connect tasks to show blockers (coming soon)
+- **Dependency lines** — SVG Bézier curves connecting tasks to show blockers, with theme-aware coloring and click-to-delete
 - **Capacity tracking** — per-sprint capacity with visual over-allocation warnings
 - **Color coding** — critical tasks, custom colors per card
-- **SQLite** — simple local persistence, no external DB needed
+- **Sticky notes** — free-floating notes with polymorphic connections to tasks, sprints, or releases
+- **Miro-style pan canvas** — space+drag or middle-click to pan around the board
+- **Dark mode** — light / dark / system toggle with FOUC prevention
 
 ## Tech Stack
 
 - **Next.js 16** + React 19 + TypeScript
-- **Tailwind CSS** for styling
+- **Tailwind CSS v4** for styling
 - **@dnd-kit** for drag-and-drop
-- **better-sqlite3** for persistence
-- **SQLite** database (auto-created in `data/soul-plan.db`)
+- **sql.js** (WASM SQLite) for persistence — runs entirely in the browser, no external DB needed
+- **SSE** (Server-Sent Events) for realtime collaboration
+- **Node.js `crypto.scrypt`** for password hashing
 
 ## Getting Started
 
@@ -26,11 +35,21 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — a default board is auto-created on first load.
+Open [http://localhost:3000](http://localhost:3000). Register an account or join an existing project via a share link.
+
+## Testing
+
+```bash
+npm test
+# or
+npx jest
+```
+
+Tests live in `src/lib/__tests__/` and cover the transform functions, auth logic, realtime EventBus, schema migrations, and query functions.
 
 ## Docker
 
-Pre-built multi-arch images are published to GHCR on every push to `master` and on `v0.1*` tags.
+Pre-built images are published to GHCR on every push to `master` and on `v0.1*` tags. Images are `linux/amd64` only — Tailwind CSS and Lightning CSS have cross-platform optional deps that don't build on arm64.
 
 ```bash
 # Pull and run (persists the SQLite DB in a named volume)
@@ -49,8 +68,6 @@ Available tags:
 - `:latest` — tracks `master`
 - `:v0.1` — latest `v0.1.*` release
 - `:sha-<short>` — every build, for pinning/reproducibility
-
-Multi-arch: `linux/amd64` and `linux/arm64` (Apple Silicon, Raspberry Pi).
 
 ## License
 

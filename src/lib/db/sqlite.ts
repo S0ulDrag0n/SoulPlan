@@ -421,7 +421,7 @@ class SqlJsDataAdapter implements IDatabase {
   }
 
   async updateProject(id: string, fields: Record<string, unknown>): Promise<void> {
-    const allowedKeys = ['name', 'owner_id'] as const;
+    const allowedKeys = ['name', 'owner_id', 'is_archived'] as const;
     const sets: string[] = [];
     const values: SqlValue[] = [];
     for (const [key, value] of Object.entries(fields)) {

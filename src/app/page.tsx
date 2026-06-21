@@ -216,10 +216,16 @@ export default function Home() {
   }, [reload, selectedProjectId]);
 
   const handleSelectProject = useCallback((project: Project | null) => {
-    setSelectedProjectId(project?.id ?? null);
+    const newId = project?.id ?? null;
+    if (newId === selectedProjectId) {
+      // Same project re-selected — just reload, don't clear state
+      reload();
+      return;
+    }
+    setSelectedProjectId(newId);
     // Clear boardState so useBoard reloads for the new project
     setBoardState(null);
-  }, [setBoardState]);
+  }, [setBoardState, selectedProjectId, reload]);
 
   // ─── Cursor tracking for realtime ──────────────────────────
   // Send content-space coordinates: mouse position minus the container's

@@ -200,12 +200,20 @@ export default function Home() {
   }, [setBoardState]);
 
   // ─── Cursor tracking for realtime ──────────────────────────
-  // Send viewport (clientX/clientY) coordinates so the fixed-position
-  // CursorOverlay can render at the right spot on screen regardless of
-  // pan/scroll state.
+  // Send content-space coordinates: viewport position minus the local pan
+  // offset and container origin.  This gives a pan-independent coordinate
+  // that every client can translate back to their own screen using their
+  // own pan offset.
+  const panRef = useRef({ x: 0, y: 0 });
+  const handlePanChange = useCallback((p: { x: number; y: number }) => {
+    panRef.current = p;
+  }, []);
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!session || !selectedProjectId) return;
-    sendCursor(e.clientX, e.clientY);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = panRef.current.x;
+    const py = panRef.current.y;
+    sendCursor(e.clientX - rect.left - px, e.clientY - rect.top - py);
   }, [session, selectedProjectId, sendCursor]);
 
   const handleAddTask = useCallback(async (sprintId: string) => {
@@ -463,7 +471,7 @@ export default function Home() {
             onDragStart={handleDragStart}
             onDragEnd={handleDragEndAndRefresh}
           >
-            <PanCanvas className="flex-1">
+            <PanCanvas className="flex-1" onPanChange={handlePanChange}>
               <div ref={boardContainerRef} className="relative p-8" onMouseMove={handleMouseMove}>
                 <div className="relative flex gap-6 min-h-[400px]">
                   <DependencyLines
@@ -513,9 +521,11 @@ export default function Home() {
             </PanCanvas>
 
             {/* CursorOverlay outside PanCanvas — fixed to viewport so
-                cursors are never clipped by overflow-hidden containers. */}
+                cursors are never clipped by overflow-hidden containers.
+                Receives content-space cursor coords and converts them to
+                screen-space using the local pan offset + container origin. */}
             {session && selectedProjectId ? (
-              <CursorOverlay cursors={cursors} selfMemberId={session.memberId} />
+              <CursorOverlay cursors={cursors} selfMemberId={session.memberId} containerRef={boardContainerRef} panRef={panRef} />
             ) : null}
 
             {/* DragOverlay outside PanCanvas so it's not affected by pan transform */}

@@ -5,6 +5,9 @@ import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react'
 interface PanCanvasProps {
   children: ReactNode;
   className?: string;
+  panRef?: React.RefObject<{ x: number; y: number }>;
+  jumpTo?: { x: number; y: number } | null;
+  onJumped?: () => void;
 }
 
 /**
@@ -17,11 +20,24 @@ interface PanCanvasProps {
  * We only start panning on middle-click OR space+left-click,
  * so regular left-click drag for card reordering is unaffected.
  */
-export default function PanCanvas({ children, className = '' }: PanCanvasProps) {
+export default function PanCanvas({ children, className = '', panRef, jumpTo, onJumped }: PanCanvasProps) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+
+  // Expose pan state to parent via ref
+  useEffect(() => {
+    if (panRef) panRef.current = pan;
+  }, [pan, panRef]);
+
+  // Jump to a specific pan offset (used by "jump to release")
+  useEffect(() => {
+    if (jumpTo) {
+      setPan(jumpTo);
+      onJumped?.();
+    }
+  }, [jumpTo, onJumped]);
 
   // Track space key for pan mode — only when no input/textarea is focused
   useEffect(() => {

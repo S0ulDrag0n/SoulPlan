@@ -65,6 +65,7 @@ export default function Home() {
   const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
   const [showAuthForm, setShowAuthForm] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [jumpPan, setJumpPan] = useState<{ x: number; y: number } | null>(null);
 
   // Ref to always-read-latest boardState in async DnD handlers
   const boardStateRef = useRef(boardState);
@@ -185,6 +186,27 @@ export default function Home() {
     await api.createRelease({ boardId: state.board.id, name: `Release ${state.releases.length + 1}` }, selectedProjectId ?? undefined);
     reload();
   }, [reload, selectedProjectId]);
+
+  // ─── Release navigation ────────────────────────────────────
+  // Pan the canvas to center a release element.
+  const panRef = useRef({ x: 0, y: 0 });
+  const scrollToRelease = useCallback((releaseId: string) => {
+    const container = boardContainerRef.current;
+    if (!container) return;
+    const el = container.querySelector(`[data-release-id="${releaseId}"]`) as HTMLElement | null;
+    if (!el) return;
+    // Element position in content-space = elementRect - containerRect - currentPan
+    // Then newPan = viewportCenter - containerOrigin - contentPos
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const cur = panRef.current;
+    const contentX = elRect.left - containerRect.left - cur.x;
+    const contentY = elRect.top - containerRect.top - cur.y;
+    // Center horizontally, top-align with header offset vertically
+    const newPanX = window.innerWidth / 2 - containerRect.left - contentX - elRect.width / 2;
+    const newPanY = 80 - containerRect.top - contentY;
+    setJumpPan({ x: newPanX, y: newPanY });
+  }, []);
 
   const handleAddSprint = useCallback(async (releaseId: string) => {
     const state = boardStateRef.current;
@@ -446,6 +468,30 @@ export default function Home() {
           >
             + Add Release
           </button>
+          {/* Release quick-nav: jump to any release */}
+          {boardState.releases.length > 0 ? (
+            <div className="flex items-center gap-1">
+              {boardState.releases.length > 1 ? (
+                <button
+                  onClick={() => boardState.releases[0] && scrollToRelease(boardState.releases[0].id)}
+                  className="px-2 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                  title="Jump to first release"
+                >
+                  ⏮ First
+                </button>
+              ) : null}
+              <select
+                onChange={(e) => { if (e.target.value) scrollToRelease(e.target.value); e.target.value = ''; }}
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 outline-none hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer"
+                defaultValue=""
+              >
+                <option value="" disabled>Jump to release…</option>
+                {boardState.releases.map((rel) => (
+                  <option key={rel.id} value={rel.id}>{rel.name}</option>
+                ))}
+              </select>
+            </div>
+          ) : null}
         </div>
       </header>
 
@@ -465,7 +511,7 @@ export default function Home() {
             onDragStart={handleDragStart}
             onDragEnd={handleDragEndAndRefresh}
           >
-            <PanCanvas className="flex-1">
+            <PanCanvas className="flex-1" panRef={panRef} jumpTo={jumpPan} onJumped={() => setJumpPan(null)}>
               <div ref={boardContainerRef} className="relative p-8" onMouseMove={handleMouseMove}>
                 <div className="relative flex gap-6 min-h-[400px]">
                   <DependencyLines
@@ -473,6 +519,12 @@ export default function Home() {
                     containerRef={boardContainerRef}
                     onDeleteDependency={handleDeleteDependency}
                   />
+                  {boardState.releases.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center w-full min-h-[300px] text-gray-400 dark:text-gray-500">
+                      <p className="text-lg mb-2">No releases yet</p>
+                      <p className="text-sm">Click "Add Release" in the header to get started.</p>
+                    </div>
+                  ) : null}
                   {boardState.releases.map((release) => (
                     <ReleaseBlock
                       key={release.id}

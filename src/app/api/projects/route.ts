@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as q from '@/lib/queries';
-import { requireUser, AuthError } from '@/lib/auth';
+import { authenticate, requireUser, AuthError } from '@/lib/auth';
 
-// GET /api/projects — list projects. ?archived=true shows archived projects.
+// GET /api/projects — list projects the authenticated user/guest is a member of.
+// ?archived=true shows archived projects they have access to.
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const archived = url.searchParams.get('archived') === 'true';
-    const projects = archived
-      ? await q.getArchivedProjects()
-      : await q.getProjects();
+    const session = await authenticate(req);
+    if (!session) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+    const projects = await q.getProjectsByMemberId(session.memberId, archived);
     return NextResponse.json(projects);
   } catch (error) {
     console.error('GET /api/projects error:', error);

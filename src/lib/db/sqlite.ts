@@ -488,7 +488,9 @@ class SqlJsDataAdapter implements IDatabase {
   }
 
   async getProjectsByMemberId(memberId: string, includeArchived: boolean = false): Promise<ProjectRow[]> {
-    const archFilter = includeArchived ? '' : 'AND p.is_archived = 0';
+    // includeArchived=true  → return ONLY archived projects the member belongs to
+    // includeArchived=false → return ONLY active (non-archived) projects
+    const archFilter = includeArchived ? 'AND p.is_archived = 1' : 'AND p.is_archived = 0';
     return getAll(
       this.db,
       `SELECT p.* FROM projects p

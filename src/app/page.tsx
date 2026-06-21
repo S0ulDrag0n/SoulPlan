@@ -64,7 +64,6 @@ export default function Home() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingRelease, setEditingRelease] = useState<Release | null>(null);
   const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
-  const [showAuthForm, setShowAuthForm] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [userRole, setUserRole] = useState<MemberRole | null>(null);
   const [jumpPan, setJumpPan] = useState<{ x: number; y: number } | null>(null);
@@ -426,8 +425,46 @@ export default function Home() {
 
   // ─── Render ───────────────────────────────────────────────
 
-  if (loading && !boardState) {
+  // Not authenticated → show login form
+  if (!session && !authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <AuthForm />
+      </div>
+    );
+  }
+
+  if (authLoading || (loading && !boardState)) {
     return <div className="p-8 text-gray-500 dark:text-gray-400">Loading...</div>;
+  }
+
+  // No project selected → prompt user to pick or create one
+  if (!selectedProjectId) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 gap-4">
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">SoulPlan</h1>
+        <p className="text-gray-500 dark:text-gray-400">
+          {session?.memberType === 'guest'
+            ? 'Select a project from the sidebar to start collaborating.'
+            : 'Create a project or select one from the sidebar to get started.'}
+        </p>
+        <div className="flex gap-3">
+          {session?.memberType === 'user' && (
+            <p className="text-sm text-gray-400 dark:text-gray-500">Use the project switcher in the top-left to create or select a project.</p>
+          )}
+        </div>
+        {/* Minimal header with just project switcher + logout */}
+        <div className="fixed top-0 left-0 right-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
+          <ProjectSwitcher currentProjectId={selectedProjectId} onSelectProject={handleSelectProject} />
+          <div className="flex items-center gap-3">
+            {session && (
+              <span className="text-sm text-gray-500 dark:text-gray-400">{session.displayName}</span>
+            )}
+            <ThemeToggle />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
@@ -475,14 +512,7 @@ export default function Home() {
           ) : null}
           {session ? (
             <span className="text-sm text-gray-500 dark:text-gray-400">{session.displayName}</span>
-          ) : (
-            <button
-              onClick={() => setShowAuthForm(true)}
-              className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              Login / Register
-            </button>
-          )}
+          ) : null}
           <ThemeToggle />
           <button
             onClick={handleAddSticky}
@@ -633,15 +663,6 @@ export default function Home() {
           onSave={handleEditSprint}
           onClose={() => setEditingSprint(null)}
         />
-      ) : null}
-
-      {/* Auth form modal */}
-      {showAuthForm && !session ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowAuthForm(false)}>
-          <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <AuthForm />
-          </div>
-        </div>
       ) : null}
 
       {/* Share dialog */}

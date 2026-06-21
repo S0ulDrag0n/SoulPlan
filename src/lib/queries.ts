@@ -391,9 +391,9 @@ export async function getProjectMembers(projectId: string): Promise<ProjectMembe
   return rows.map(toProjectMember);
 }
 
-export async function getProjectsByMemberId(memberId: string): Promise<Project[]> {
+export async function getProjectsByMemberId(memberId: string, includeArchived: boolean = false): Promise<Project[]> {
   const db: IDatabase = await getDb();
-  const rows = await db.getProjectsByMemberId(memberId);
+  const rows = await db.getProjectsByMemberId(memberId, includeArchived);
   return rows.map(toProject);
 }
 

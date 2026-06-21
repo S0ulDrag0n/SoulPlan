@@ -1,13 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import type { RemoteCursor } from '@/hooks/useRealtime';
 
 interface CursorOverlayProps {
   cursors: Map<string, RemoteCursor>;
   selfMemberId: string | null;
   containerRef: React.RefObject<HTMLDivElement | null>;
-  panRef: React.RefObject<{ x: number; y: number }>;
 }
 
 // Color palette for remote cursors — cycles through these per member ID hash
@@ -31,41 +29,7 @@ function colorForMember(memberId: string): string {
   return CURSOR_COLORS[Math.abs(hash) % CURSOR_COLORS.length];
 }
 
-export default function CursorOverlay({ cursors, selfMemberId, containerRef, panRef }: CursorOverlayProps) {
-  // Track the container's viewport rect so we can convert content-space
-  // cursor coords back to screen-space for the fixed-position overlay.
-  const [origin, setOrigin] = useState({ left: 0, top: 0 });
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-
-  // Re-measure on mount and when the container resizes / scrolls.
-  useEffect(() => {
-    const update = () => {
-      const el = containerRef.current;
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        setOrigin({ left: rect.left, top: rect.top });
-      }
-      if (panRef.current) setPan(panRef.current);
-    };
-    update();
-    window.addEventListener('resize', update);
-    window.addEventListener('scroll', update, true);
-    return () => {
-      window.removeEventListener('resize', update);
-      window.removeEventListener('scroll', update, true);
-    };
-  }, [containerRef, panRef]);
-
-  // Also poll pan changes (panRef is a mutable ref, not reactive)
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (panRef.current) {
-        setPan(prev => (prev.x === panRef.current!.x && prev.y === panRef.current!.y) ? prev : { ...panRef.current });
-      }
-    }, 100);
-    return () => clearInterval(id);
-  }, [panRef]);
-
+export default function CursorOverlay({ cursors, selfMemberId, containerRef }: CursorOverlayProps) {
   // Filter out our own cursor and stale cursors
   const remoteCursors = Array.from(cursors.values()).filter(
     c => c.memberId !== selfMemberId
@@ -73,13 +37,19 @@ export default function CursorOverlay({ cursors, selfMemberId, containerRef, pan
 
   if (remoteCursors.length === 0) return null;
 
+  // The container lives inside the pannable content, so its rect already
+  // reflects the current pan offset.  We read it here to convert
+  // content-space cursor coords → screen-space for the fixed overlay.
+  const rect = containerRef.current?.getBoundingClientRect();
+  const originLeft = rect?.left ?? 0;
+  const originTop = rect?.top ?? 0;
+
   return (
     <div className="fixed inset-0 pointer-events-none z-50">
       {remoteCursors.map((cursor) => {
         const color = colorForMember(cursor.memberId);
-        // Convert content-space coords → screen-space using local pan + container origin
-        const screenX = cursor.x + origin.left + pan.x;
-        const screenY = cursor.y + origin.top + pan.y;
+        const screenX = cursor.x + originLeft;
+        const screenY = cursor.y + originTop;
         return (
           <div
             key={cursor.memberId}

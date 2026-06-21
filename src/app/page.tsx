@@ -200,20 +200,14 @@ export default function Home() {
   }, [setBoardState]);
 
   // ─── Cursor tracking for realtime ──────────────────────────
-  // Send content-space coordinates: viewport position minus the local pan
-  // offset and container origin.  This gives a pan-independent coordinate
-  // that every client can translate back to their own screen using their
-  // own pan offset.
-  const panRef = useRef({ x: 0, y: 0 });
-  const handlePanChange = useCallback((p: { x: number; y: number }) => {
-    panRef.current = p;
-  }, []);
+  // Send content-space coordinates: mouse position minus the container's
+  // viewport origin.  The container lives inside the pannable content, so
+  // its rect already includes the pan offset — no separate pan tracking
+  // needed.  Each receiver adds their own container origin to render.
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!session || !selectedProjectId) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const px = panRef.current.x;
-    const py = panRef.current.y;
-    sendCursor(e.clientX - rect.left - px, e.clientY - rect.top - py);
+    sendCursor(e.clientX - rect.left, e.clientY - rect.top);
   }, [session, selectedProjectId, sendCursor]);
 
   const handleAddTask = useCallback(async (sprintId: string) => {
@@ -471,7 +465,7 @@ export default function Home() {
             onDragStart={handleDragStart}
             onDragEnd={handleDragEndAndRefresh}
           >
-            <PanCanvas className="flex-1" onPanChange={handlePanChange}>
+            <PanCanvas className="flex-1">
               <div ref={boardContainerRef} className="relative p-8" onMouseMove={handleMouseMove}>
                 <div className="relative flex gap-6 min-h-[400px]">
                   <DependencyLines
@@ -525,7 +519,7 @@ export default function Home() {
                 Receives content-space cursor coords and converts them to
                 screen-space using the local pan offset + container origin. */}
             {session && selectedProjectId ? (
-              <CursorOverlay cursors={cursors} selfMemberId={session.memberId} containerRef={boardContainerRef} panRef={panRef} />
+              <CursorOverlay cursors={cursors} selfMemberId={session.memberId} containerRef={boardContainerRef} />
             ) : null}
 
             {/* DragOverlay outside PanCanvas so it's not affected by pan transform */}

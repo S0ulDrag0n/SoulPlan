@@ -288,3 +288,28 @@ export interface ActivityLogEntry {
   detail: string | null;
   createdAt: string;
 }
+
+// ─── Search & Filter types ────────────────────────────────
+
+/** A task search result with release/sprint context for navigation. */
+export interface SearchResult {
+  id: string;
+  title: string;
+  sprintId: string;
+  sprintName: string;
+  releaseId: string;
+  releaseName: string;
+  estimate: number;
+  color: string;
+  isCritical: boolean;
+}
+
+/** Filter state for the project header filter bar. */
+export interface TaskFilter {
+  /** Filter by task status: 'todo' | 'in-progress' | 'done' | undefined (no filter) */
+  status?: 'todo' | 'in-progress' | 'done';
+  /** Filter by sprint ID, or undefined for no sprint filter */
+  sprintId?: string;
+  /** When true, show only tasks that have a Jira issue link */
+  hasJira?: boolean;
+}

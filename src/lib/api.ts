@@ -8,6 +8,7 @@ import type {
   Project, Session, ProjectMember, ProjectInvite,
   CreateProjectInput, RegisterInput, LoginInput, JoinAsGuestInput,
   MemberType, MemberRole,
+  SearchResult,
 } from '@/lib/types';
 
 const BASE = '/api';
@@ -329,4 +330,11 @@ export function verifySession(): Promise<{ authenticated: boolean; session?: Ses
 
 export function logout(): Promise<{ success: boolean }> {
   return request('/auth', { method: 'DELETE' });
+}
+
+// ─── Search ───────────────────────────────────────────────
+
+export function searchTasks(projectId: string, query: string): Promise<{ results: SearchResult[] }> {
+  const qs = `?q=${encodeURIComponent(query)}&projectId=${encodeURIComponent(projectId)}`;
+  return request<{ results: SearchResult[] }>(`/search${qs}`);
 }

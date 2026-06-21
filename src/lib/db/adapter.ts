@@ -78,6 +78,12 @@ export interface IDatabase {
   updateTask(id: string, fields: Record<string, unknown>): Promise<void>;
   deleteTask(id: string): Promise<void>;
   getMaxTaskPosition(sprintId: string): Promise<number>;
+  /**
+   * Search tasks by title (case-insensitive LIKE) within a project's boards.
+   * Returns raw task rows joined with their sprint + release names so the
+   * caller can build search-result objects with context.
+   */
+  searchTasksByProjectId(projectId: string, query: string): Promise<(TaskRow & { sprint_name: string; release_name: string })[]>;
 
   // ─── Dependencies ──────────────────────────────────────
   getDependenciesByTaskIds(taskIds: string[]): Promise<DependencyRow[]>;

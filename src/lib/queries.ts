@@ -21,6 +21,7 @@ import type {
   MemberType, MemberRole,
   CreateProjectInput, UpdateProjectInput,
   RegisterInput, LoginInput, JoinAsGuestInput,
+  ProjectExport, ProjectImportPayload, ProjectImportResult,
 } from './types';
 
 // ─── Board queries ────────────────────────────────────────
@@ -473,4 +474,137 @@ export async function acceptInvite(
   const session = await createSessionInternal(db, 'guest', guest.id, guest.name);
 
   return { guest, session, project, invite };
+}
+
+// ─── Export / Import queries ──────────────────────────────
+
+/**
+ * Export a full project: the project row plus every board (with its
+ * releases → sprints → tasks tree, dependencies, sticky notes, and note
+ * connections). Returns a portable JSON snapshot.
+ *
+ * Returns null if the project does not exist.
+ */
+export async function exportProject(projectId: string): Promise<ProjectExport | null> {
+  const project = await getProject(projectId);
+  if (!project) return null;
+  const boards = await getBoardsByProjectId(projectId);
+  return {
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    project,
+    boards,
+  };
+}
+
+/**
+ * Import a previously-exported project snapshot into a NEW project owned by
+ * `ownerId`. Every entity (board, release, sprint, task, dependency, sticky
+ * note, note connection) is recreated with a fresh UUID, and all parent/child
+ * references are remapped via ID maps so the imported tree is internally
+ * consistent and never collides with existing rows.
+ *
+ * The new project's name comes from `payload.project.name` (allowing the
+ * caller to rename on import). The supplied `projectId` path param is NOT
+ * used as the new project ID — a fresh UUID is generated.
+ */
+export async function importProject(
+  payload: ProjectImportPayload,
+  ownerId: string | null = null
+): Promise<ProjectImportResult> {
+  const db: IDatabase = await getDb();
+
+  // 1. Create the new project (this also auto-adds the owner as a member
+  //    via createProject when ownerId is provided).
+  const project = await createProject({ name: payload.project.name }, ownerId);
+
+  // ID maps: oldId → newId, populated as each entity is created.
+  const boardIdMap = new Map<string, string>();
+  const releaseIdMap = new Map<string, string>();
+  const sprintIdMap = new Map<string, string>();
+  const taskIdMap = new Map<string, string>();
+  const stickyNoteIdMap = new Map<string, string>();
+
+  for (const boardState of payload.boards) {
+    const newBoardId = randomUUID();
+    const boardRow = await db.createBoard(newBoardId, boardState.board.name, project.id);
+    boardIdMap.set(boardState.board.id, boardRow.id);
+
+    for (const release of boardState.releases) {
+      const newReleaseId = randomUUID();
+      const releaseRow = await db.createRelease(newReleaseId, boardRow.id, release.name, release.position);
+      releaseIdMap.set(release.id, releaseRow.id);
+      // Restore optional release fields (targetDate, notes) that createRelease doesn't set.
+      const releaseFields: Record<string, unknown> = {};
+      if (release.targetDate !== null && release.targetDate !== undefined) releaseFields.target_date = release.targetDate;
+      if (release.notes !== null && release.notes !== undefined) releaseFields.notes = release.notes;
+      if (Object.keys(releaseFields).length > 0) await db.updateRelease(releaseRow.id, releaseFields);
+
+      for (const sprint of release.sprints) {
+        const newSprintId = randomUUID();
+        const sprintRow = await db.createSprint(newSprintId, releaseRow.id, sprint.name, sprint.position);
+        sprintIdMap.set(sprint.id, sprintRow.id);
+        // Restore optional sprint fields.
+        const sprintFields: Record<string, unknown> = {};
+        if (sprint.capacity !== undefined) sprintFields.capacity = sprint.capacity;
+        if (sprint.capacityUnit !== undefined) sprintFields.capacity_unit = sprint.capacityUnit;
+        if (sprint.startDate !== null && sprint.startDate !== undefined) sprintFields.start_date = sprint.startDate;
+        if (sprint.endDate !== null && sprint.endDate !== undefined) sprintFields.end_date = sprint.endDate;
+        if (sprint.notes !== null && sprint.notes !== undefined) sprintFields.notes = sprint.notes;
+        if (Object.keys(sprintFields).length > 0) await db.updateSprint(sprintRow.id, sprintFields);
+
+        for (const task of sprint.tasks) {
+          const newTaskId = randomUUID();
+          const taskRow = await db.createTask(newTaskId, sprintRow.id, task.title, task.position);
+          taskIdMap.set(task.id, taskRow.id);
+          // Restore optional task fields.
+          const taskFields: Record<string, unknown> = {};
+          if (task.description !== null && task.description !== undefined) taskFields.description = task.description;
+          if (task.estimate !== undefined) taskFields.estimate = task.estimate;
+          if (task.color !== undefined) taskFields.color = task.color;
+          if (task.isCritical !== undefined) taskFields.is_critical = task.isCritical ? 1 : 0;
+          if (Object.keys(taskFields).length > 0) await db.updateTask(taskRow.id, taskFields);
+        }
+      }
+    }
+
+    // Dependencies — remap from/to task IDs. Skip any whose tasks weren't
+    // imported (defensive: a dependency could reference a task outside this
+    // board in a multi-board project; we only have this board's tasks).
+    for (const dep of boardState.dependencies) {
+      const newFrom = taskIdMap.get(dep.fromTaskId);
+      const newTo = taskIdMap.get(dep.toTaskId);
+      if (!newFrom || !newTo) continue;
+      await db.createDependency(randomUUID(), newFrom, newTo);
+    }
+
+    // Sticky notes — remap board ID.
+    for (const note of boardState.stickyNotes) {
+      const newNoteId = randomUUID();
+      const noteRow = await db.createStickyNote(
+        newNoteId,
+        boardRow.id,
+        note.text,
+        note.x,
+        note.y,
+        note.color,
+        note.z
+      );
+      stickyNoteIdMap.set(note.id, noteRow.id);
+    }
+
+    // Note connections — remap noteId and toId (task/sprint/release).
+    for (const conn of boardState.noteConnections) {
+      const newNoteId = stickyNoteIdMap.get(conn.noteId);
+      if (!newNoteId) continue;
+      let newToId: string | undefined;
+      if (conn.toType === 'task') newToId = taskIdMap.get(conn.toId);
+      else if (conn.toType === 'sprint') newToId = sprintIdMap.get(conn.toId);
+      else if (conn.toType === 'release') newToId = releaseIdMap.get(conn.toId);
+      if (!newToId) continue;
+      await db.createNoteConnection(randomUUID(), newNoteId, conn.toType, newToId);
+    }
+  }
+
+  return { project };
 }

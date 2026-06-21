@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Project } from '@/lib/types';
 import * as api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
@@ -8,9 +8,11 @@ import { useAuth } from '@/components/AuthProvider';
 interface ProjectSwitcherProps {
   currentProjectId: string | null;
   onSelectProject: (project: Project | null) => void;
+  /** Called when the user picks an export JSON file to import as a new project. */
+  onImportProject?: (file: File) => void;
 }
 
-export default function ProjectSwitcher({ currentProjectId, onSelectProject }: ProjectSwitcherProps) {
+export default function ProjectSwitcher({ currentProjectId, onSelectProject, onImportProject }: ProjectSwitcherProps) {
   const { session, logout } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
@@ -20,6 +22,7 @@ export default function ProjectSwitcher({ currentProjectId, onSelectProject }: P
   const [newProjectName, setNewProjectName] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -272,6 +275,33 @@ export default function ProjectSwitcher({ currentProjectId, onSelectProject }: P
                       + New Project
                     </button>
                   )}
+                  {/* Import — pick an export JSON file and create a new project from it. */}
+                  {onImportProject && currentProjectId ? (
+                    <>
+                      <input
+                        ref={importFileRef}
+                        type="file"
+                        accept="application/json,.json"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            onImportProject(file);
+                            setOpen(false);
+                          }
+                          // Reset so the same file can be picked again later.
+                          e.target.value = '';
+                        }}
+                      />
+                      <button
+                        onClick={() => importFileRef.current?.click()}
+                        className="w-full text-left px-3 py-2 rounded-md text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium"
+                        title="Import a project from an exported JSON file"
+                      >
+                        ⬆ Import Project
+                      </button>
+                    </>
+                  ) : null}
                 </>
               )}
 

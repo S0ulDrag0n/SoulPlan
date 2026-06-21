@@ -249,6 +249,46 @@ export default function Home() {
     setBoardState(null);
   }, [setBoardState, selectedProjectId, reload]);
 
+  // ─── Export / Import ───────────────────────────────────────
+  // Export downloads the full project snapshot as a JSON file. Import reads a
+  // previously-exported file and creates a brand-new project from it.
+  const handleExportProject = useCallback(async () => {
+    if (!selectedProjectId) return;
+    try {
+      const data = await api.exportProject(selectedProjectId);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeName = data.project.name.replace(/[^a-zA-Z0-9-_]/g, '_');
+      a.download = `${safeName}-export.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export project:', err);
+      alert('Failed to export project. Are you a project owner?');
+    }
+  }, [selectedProjectId]);
+
+  const handleImportProject = useCallback(async (file: File) => {
+    if (!selectedProjectId || !session) return;
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      // The import endpoint takes the payload and creates a new project.
+      // The source project ID is used only for the owner-permission check.
+      const newProject = await api.importProject(selectedProjectId, payload);
+      // Switch to the newly imported project.
+      setSelectedProjectId(newProject.id);
+      setBoardState(null);
+    } catch (err) {
+      console.error('Failed to import project:', err);
+      alert('Failed to import project. Please select a valid export JSON file.');
+    }
+  }, [selectedProjectId, session, setBoardState]);
+
   // ─── Cursor tracking for realtime ──────────────────────────
   // Send content-space coordinates: mouse position minus the container's
   // viewport origin.  The container lives inside the pannable content, so
@@ -493,7 +533,7 @@ export default function Home() {
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <ProjectSwitcher currentProjectId={selectedProjectId} onSelectProject={handleSelectProject} />
+          <ProjectSwitcher currentProjectId={selectedProjectId} onSelectProject={handleSelectProject} onImportProject={handleImportProject} />
           <BoardTitle boardState={boardState} isOwner={isOwner} onRename={handleRenameBoard} />
         </div>
         <div className="flex items-center gap-3">
@@ -508,6 +548,15 @@ export default function Home() {
               title="Share this project"
             >
               <span>🔗</span> Share
+            </button>
+          ) : null}
+          {session && selectedProjectId && isOwner ? (
+            <button
+              onClick={handleExportProject}
+              className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1"
+              title="Export this project as a JSON file"
+            >
+              <span>⬇</span> Export
             </button>
           ) : null}
           {session ? (

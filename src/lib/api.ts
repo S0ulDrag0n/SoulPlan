@@ -8,6 +8,7 @@ import type {
   Project, Session, ProjectMember, ProjectInvite,
   CreateProjectInput, RegisterInput, LoginInput, JoinAsGuestInput,
   MemberType, MemberRole,
+  ProjectExport, ProjectImportPayload,
 } from '@/lib/types';
 
 const BASE = '/api';
@@ -224,6 +225,28 @@ export function fetchArchivedProjects(): Promise<Project[]> {
 export function deleteProject(id: string): Promise<{ success: boolean }> {
   return request<{ success: boolean }>(`/projects/${id}`, {
     method: 'DELETE',
+  });
+}
+
+// ─── Export / Import ──────────────────────────────────────
+
+/** Export a full project snapshot (project + all boards). Owner-only. */
+export function exportProject(id: string): Promise<ProjectExport> {
+  return request<ProjectExport>(`/projects/${id}/export`);
+}
+
+/**
+ * Import a previously-exported snapshot into a NEW project owned by the
+ * authenticated user. `sourceProjectId` is only used for the owner-permission
+ * check on the source project; the imported data lands in a fresh project.
+ */
+export function importProject(
+  sourceProjectId: string,
+  payload: ProjectImportPayload
+): Promise<Project> {
+  return request<Project>(`/projects/${sourceProjectId}/import`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }
 

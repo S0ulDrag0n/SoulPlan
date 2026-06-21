@@ -265,3 +265,34 @@ export interface AddProjectMemberInput {
   memberId: string;
   role?: MemberRole;
 }
+
+// ─── Export / Import types ─────────────────────────────────
+
+/**
+ * Full project export — a self-contained, portable snapshot of a project
+ * and every board/release/sprint/task/dependency/sticky-note/note-connection
+ * beneath it. All IDs are the ORIGINAL IDs from the source project; the
+ * import path remaps them to fresh UUIDs so imports never collide.
+ *
+ * Versioned via `schemaVersion` so future format changes can be detected
+ * and migrated. The body is intentionally the same shape the API already
+ * returns (BoardState per board) so export is a thin aggregation step.
+ */
+export interface ProjectExport {
+  schemaVersion: 1;
+  exportedAt: string;
+  project: Project;
+  boards: BoardState[];
+}
+
+/** Payload accepted by POST /api/projects/[id]/import. */
+export interface ProjectImportPayload {
+  schemaVersion: 1;
+  project: { name: string };
+  boards: BoardState[];
+}
+
+/** Result returned by POST /api/projects/[id]/import — the newly created project. */
+export interface ProjectImportResult {
+  project: Project;
+}

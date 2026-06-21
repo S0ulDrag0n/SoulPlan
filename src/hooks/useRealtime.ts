@@ -24,16 +24,31 @@ export interface EditingIndicator {
   timestamp: number;
 }
 
+export interface UseRealtimeOptions {
+  /** Called when a `board-update` event arrives (e.g. a collaborator mutated the board). */
+  onBoardUpdate?: (change: string) => void;
+}
+
 /**
  * useRealtime — connects to SSE endpoint for a project, tracks cursors,
  * presence, and editing indicators.
  */
-export function useRealtime(projectId: string | null, session: Session | null) {
+export function useRealtime(
+  projectId: string | null,
+  session: Session | null,
+  options?: UseRealtimeOptions,
+) {
   const [cursors, setCursors] = useState<Map<string, RemoteCursor>>(new Map());
   const [presence, setPresence] = useState<PresenceMember[]>([]);
   const [editing, setEditing] = useState<Map<string, EditingIndicator>>(new Map());
   const eventSourceRef = useRef<EventSource | null>(null);
   const cursorThrottleRef = useRef<number | null>(null);
+
+  // Keep the latest onBoardUpdate callback in a ref so the SSE effect
+  // (which only re-runs on projectId/session change) always calls the
+  // freshest version without re-subscribing to the EventSource.
+  const onBoardUpdateRef = useRef(options?.onBoardUpdate);
+  onBoardUpdateRef.current = options?.onBoardUpdate;
 
   // Connect to SSE
   useEffect(() => {
@@ -94,6 +109,8 @@ export function useRealtime(projectId: string | null, session: Session | null) {
             });
             return next;
           });
+        } else if (data.type === 'board-update') {
+          onBoardUpdateRef.current?.(data.change);
         }
       } catch {
         // Ignore malformed events

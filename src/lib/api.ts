@@ -43,127 +43,132 @@ export function fetchBoard(projectId?: string): Promise<BoardState> {
 
 // ─── Releases ─────────────────────────────────────────────
 
-export function createRelease(input: CreateReleaseInput): Promise<unknown> {
+export function createRelease(input: CreateReleaseInput, projectId?: string): Promise<unknown> {
   return request('/releases', {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, ...(projectId ? { projectId } : {}) }),
   });
 }
 
-export function updateRelease(id: string, input: Omit<UpdateReleaseInput, 'id'>): Promise<{ success: boolean }> {
+export function updateRelease(id: string, input: Omit<UpdateReleaseInput, 'id'>, projectId?: string): Promise<{ success: boolean }> {
   return request<{ success: boolean }>(`/releases/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, ...(projectId ? { projectId } : {}) }),
   });
 }
 
-export function deleteRelease(id: string): Promise<{ success: boolean }> {
+export function deleteRelease(id: string, projectId?: string): Promise<{ success: boolean }> {
   return request<{ success: boolean }>(`/releases/${id}`, {
     method: 'DELETE',
+    body: JSON.stringify({ ...(projectId ? { projectId } : {}) }),
   });
 }
 
 // ─── Sprints ──────────────────────────────────────────────
 
-export function createSprint(input: CreateSprintInput): Promise<unknown> {
+export function createSprint(input: CreateSprintInput, projectId?: string): Promise<unknown> {
   return request('/sprints', {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, ...(projectId ? { projectId } : {}) }),
   });
 }
 
-export function updateSprint(id: string, input: Omit<UpdateSprintInput, 'id'>): Promise<{ success: boolean }> {
+export function updateSprint(id: string, input: Omit<UpdateSprintInput, 'id'>, projectId?: string): Promise<{ success: boolean }> {
   return request<{ success: boolean }>(`/sprints/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, ...(projectId ? { projectId } : {}) }),
   });
 }
 
-export function deleteSprint(id: string): Promise<{ success: boolean }> {
+export function deleteSprint(id: string, projectId?: string): Promise<{ success: boolean }> {
   return request<{ success: boolean }>(`/sprints/${id}`, {
     method: 'DELETE',
+    body: JSON.stringify({ ...(projectId ? { projectId } : {}) }),
   });
 }
 
 // ─── Tasks ────────────────────────────────────────────────
 
-export function createTask(input: CreateTaskInput): Promise<Task> {
+export function createTask(input: CreateTaskInput, projectId?: string): Promise<Task> {
   return request<Task>('/tasks', {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, ...(projectId ? { projectId } : {}) }),
   });
 }
 
-export function updateTask(input: UpdateTaskInput): Promise<{ success: boolean }> {
+export function updateTask(input: UpdateTaskInput, projectId?: string): Promise<{ success: boolean }> {
   return request<{ success: boolean }>('/tasks', {
     method: 'PATCH',
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, ...(projectId ? { projectId } : {}) }),
   });
 }
 
-export function deleteTask(id: string): Promise<{ success: boolean }> {
+export function deleteTask(id: string, projectId?: string): Promise<{ success: boolean }> {
   return request<{ success: boolean }>('/tasks', {
     method: 'DELETE',
-    body: JSON.stringify({ id }),
+    body: JSON.stringify({ id, ...(projectId ? { projectId } : {}) }),
   });
 }
 
 // ─── Dependencies ──────────────────────────────────────────
 
-export function createDependency(fromTaskId: string, toTaskId: string): Promise<Dependency> {
+export function createDependency(fromTaskId: string, toTaskId: string, projectId?: string): Promise<Dependency> {
   return request<Dependency>('/dependencies', {
     method: 'POST',
-    body: JSON.stringify({ fromTaskId, toTaskId }),
+    body: JSON.stringify({ fromTaskId, toTaskId, ...(projectId ? { projectId } : {}) }),
   });
 }
 
-export function deleteDependency(id: string): Promise<{ success: boolean }> {
+export function deleteDependency(id: string, projectId?: string): Promise<{ success: boolean }> {
   return request<{ success: boolean }>('/dependencies', {
     method: 'DELETE',
-    body: JSON.stringify({ id }),
+    body: JSON.stringify({ id, ...(projectId ? { projectId } : {}) }),
   });
 }
 
 // ─── Sticky notes ─────────────────────────────────────────
 
-export function createStickyNote(input: CreateStickyNoteInput): Promise<StickyNote> {
+export function createStickyNote(input: CreateStickyNoteInput, projectId?: string): Promise<StickyNote> {
   return request<StickyNote>('/sticky-notes', {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, ...(projectId ? { projectId } : {}) }),
   });
 }
 
 export function updateStickyNote(
   id: string,
-  input: Omit<UpdateStickyNoteInput, 'id'>
+  input: Omit<UpdateStickyNoteInput, 'id'>,
+  projectId?: string,
 ): Promise<{ success: boolean }> {
   return request<{ success: boolean }>(`/sticky-notes/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, ...(projectId ? { projectId } : {}) }),
   });
 }
 
-export function deleteStickyNote(id: string): Promise<{ success: boolean }> {
+export function deleteStickyNote(id: string, projectId?: string): Promise<{ success: boolean }> {
   return request<{ success: boolean }>(`/sticky-notes/${id}`, {
     method: 'DELETE',
+    body: JSON.stringify({ ...(projectId ? { projectId } : {}) }),
   });
 }
 
 // ─── Note connections ─────────────────────────────────────
 
 export function createNoteConnection(
-  input: CreateNoteConnectionInput
+  input: CreateNoteConnectionInput,
+  projectId?: string,
 ): Promise<NoteConnection> {
   return request<NoteConnection>('/note-connections', {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, ...(projectId ? { projectId } : {}) }),
   });
 }
 
-export function deleteNoteConnection(id: string): Promise<{ success: boolean }> {
+export function deleteNoteConnection(id: string, projectId?: string): Promise<{ success: boolean }> {
   return request<{ success: boolean }>('/note-connections', {
     method: 'DELETE',
-    body: JSON.stringify({ id }),
+    body: JSON.stringify({ id, ...(projectId ? { projectId } : {}) }),
   });
 }
 

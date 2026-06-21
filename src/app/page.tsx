@@ -55,8 +55,10 @@ export default function Home() {
   // For now, allow unauthenticated access to keep backward compat — the
   // default board still works. Auth is required only for creating projects.
   const { boardState, setBoardState, loading, error, reload } = useBoard(selectedProjectId ?? undefined);
-  const { saving, error: mutationError, moveTask, createTask, saveTask, deleteTask, reorderTasks } = useTaskMutations(boardState, reload, setBoardState);
-  const { cursors, presence, sendCursor } = useRealtime(selectedProjectId, session);
+  const { saving, error: mutationError, moveTask, createTask, saveTask, deleteTask, reorderTasks } = useTaskMutations(boardState, reload, setBoardState, selectedProjectId);
+  const { cursors, presence, sendCursor } = useRealtime(selectedProjectId, session, {
+    onBoardUpdate: () => debouncedReload(),
+  });
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingRelease, setEditingRelease] = useState<Release | null>(null);
@@ -70,6 +72,18 @@ export default function Home() {
 
   // Ref for the scrollable board container (for dependency lines)
   const boardContainerRef = useRef<HTMLDivElement>(null);
+
+  // Debounced reload — coalesces rapid board-update events from multiple
+  // collaborators into a single board fetch (avoids stampede when several
+  // mutations arrive within a short window).
+  const reloadTimerRef = useRef<number | null>(null);
+  const debouncedReload = useCallback(() => {
+    if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = window.setTimeout(() => {
+      reloadTimerRef.current = null;
+      reload();
+    }, 300);
+  }, [reload]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -138,21 +152,21 @@ export default function Home() {
 
   const handleCreateDependency = useCallback(async (fromTaskId: string, toTaskId: string) => {
     try {
-      await api.createDependency(fromTaskId, toTaskId);
+      await api.createDependency(fromTaskId, toTaskId, selectedProjectId ?? undefined);
     } catch (err) {
       console.error('Failed to create dependency:', err);
     }
     reload();
-  }, [reload]);
+  }, [reload, selectedProjectId]);
 
   const handleDeleteDependency = useCallback(async (depId: string) => {
     try {
-      await api.deleteDependency(depId);
+      await api.deleteDependency(depId, selectedProjectId ?? undefined);
     } catch (err) {
       console.error('Failed to delete dependency:', err);
     }
     reload();
-  }, [reload]);
+  }, [reload, selectedProjectId]);
 
   // ─── Jump to task (for dependency badges) ────────────────
 
@@ -168,16 +182,16 @@ export default function Home() {
   const handleAddRelease = useCallback(async () => {
     const state = boardStateRef.current;
     if (!state) return;
-    await api.createRelease({ boardId: state.board.id, name: `Release ${state.releases.length + 1}` });
+    await api.createRelease({ boardId: state.board.id, name: `Release ${state.releases.length + 1}` }, selectedProjectId ?? undefined);
     reload();
-  }, [reload]);
+  }, [reload, selectedProjectId]);
 
   const handleAddSprint = useCallback(async (releaseId: string) => {
     const state = boardStateRef.current;
     const release = state?.releases.find(r => r.id === releaseId);
-    await api.createSprint({ releaseId, name: `Sprint ${(release?.sprints.length ?? 0) + 1}` });
+    await api.createSprint({ releaseId, name: `Sprint ${(release?.sprints.length ?? 0) + 1}` }, selectedProjectId ?? undefined);
     reload();
-  }, [reload]);
+  }, [reload, selectedProjectId]);
 
   const handleSelectProject = useCallback((project: Project | null) => {
     setSelectedProjectId(project?.id ?? null);
@@ -206,31 +220,31 @@ export default function Home() {
   const handleDeleteTask = useCallback(async (id: string) => void deleteTask(id), [deleteTask]);
 
   const handleEditRelease = useCallback(async (id: string, data: { name?: string; targetDate?: string | null; notes?: string | null }) => {
-    await api.updateRelease(id, data);
+    await api.updateRelease(id, data, selectedProjectId ?? undefined);
     setEditingRelease(null);
     reload();
-  }, [reload]);
+  }, [reload, selectedProjectId]);
 
   const handleDeleteRelease = useCallback(async (id: string) => {
     if (!confirm('Delete this release and all its sprints and tasks?')) return;
-    await api.deleteRelease(id);
+    await api.deleteRelease(id, selectedProjectId ?? undefined);
     reload();
-  }, [reload]);
+  }, [reload, selectedProjectId]);
 
   const handleEditSprint = useCallback(async (id: string, data: {
     name?: string; capacity?: number; capacityUnit?: string;
     startDate?: string | null; endDate?: string | null; notes?: string | null;
   }) => {
-    await api.updateSprint(id, data);
+    await api.updateSprint(id, data, selectedProjectId ?? undefined);
     setEditingSprint(null);
     reload();
-  }, [reload]);
+  }, [reload, selectedProjectId]);
 
   const handleDeleteSprint = useCallback(async (id: string) => {
     if (!confirm('Delete this sprint and all its tasks?')) return;
-    await api.deleteSprint(id);
+    await api.deleteSprint(id, selectedProjectId ?? undefined);
     reload();
-  }, [reload]);
+  }, [reload, selectedProjectId]);
 
   // ─── Sticky note handlers ─────────────────────────────────
 
@@ -244,9 +258,9 @@ export default function Home() {
       x: 400,
       y: 50,
       color: 'yellow',
-    });
+    }, selectedProjectId ?? undefined);
     reload();
-  }, [reload]);
+  }, [reload, selectedProjectId]);
 
   const handleMoveSticky = useCallback(async (id: string, x: number, y: number) => {
     // Optimistic update
@@ -260,12 +274,12 @@ export default function Home() {
       };
     });
     try {
-      await api.updateStickyNote(id, { x, y });
+      await api.updateStickyNote(id, { x, y }, selectedProjectId ?? undefined);
     } catch (err) {
       console.error('Failed to move sticky note:', err);
       reload();
     }
-  }, [reload, setBoardState]);
+  }, [reload, setBoardState, selectedProjectId]);
 
   const handleTextChangeSticky = useCallback(async (id: string, text: string) => {
     setBoardState((prev) => {
@@ -278,12 +292,12 @@ export default function Home() {
       };
     });
     try {
-      await api.updateStickyNote(id, { text });
+      await api.updateStickyNote(id, { text }, selectedProjectId ?? undefined);
     } catch (err) {
       console.error('Failed to update sticky note text:', err);
       reload();
     }
-  }, [reload, setBoardState]);
+  }, [reload, setBoardState, selectedProjectId]);
 
   const handleDeleteSticky = useCallback(async (id: string) => {
     // Optimistic
@@ -296,12 +310,12 @@ export default function Home() {
       };
     });
     try {
-      await api.deleteStickyNote(id);
+      await api.deleteStickyNote(id, selectedProjectId ?? undefined);
     } catch (err) {
       console.error('Failed to delete sticky note:', err);
       reload();
     }
-  }, [reload, setBoardState]);
+  }, [reload, setBoardState, selectedProjectId]);
 
   const handleColorCycleSticky = useCallback(async (id: string) => {
     const state = boardStateRef.current;
@@ -320,25 +334,25 @@ export default function Home() {
       };
     });
     try {
-      await api.updateStickyNote(id, { color: nextColor });
+      await api.updateStickyNote(id, { color: nextColor }, selectedProjectId ?? undefined);
     } catch (err) {
       console.error('Failed to update sticky note color:', err);
       reload();
     }
-  }, [reload, setBoardState]);
+  }, [reload, setBoardState, selectedProjectId]);
 
   // ─── Note connection handlers ─────────────────────────────
 
   const handleCreateNoteConnection = useCallback(
     async (noteId: string, toType: NoteConnectionTargetType, toId: string) => {
       try {
-        await api.createNoteConnection({ noteId, toType, toId });
+        await api.createNoteConnection({ noteId, toType, toId }, selectedProjectId ?? undefined);
       } catch (err) {
         console.error('Failed to create note connection:', err);
       }
       reload();
     },
-    [reload]
+    [reload, selectedProjectId]
   );
 
   const handleDeleteNoteConnection = useCallback(async (id: string) => {
@@ -350,12 +364,12 @@ export default function Home() {
       };
     });
     try {
-      await api.deleteNoteConnection(id);
+      await api.deleteNoteConnection(id, selectedProjectId ?? undefined);
     } catch (err) {
       console.error('Failed to delete note connection:', err);
       reload();
     }
-  }, [reload, setBoardState]);
+  }, [reload, setBoardState, selectedProjectId]);
 
   // ─── Render ───────────────────────────────────────────────
 

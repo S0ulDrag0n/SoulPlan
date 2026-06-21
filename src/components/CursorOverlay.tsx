@@ -37,7 +37,7 @@ export default function CursorOverlay({ cursors, selfMemberId }: CursorOverlayPr
   if (remoteCursors.length === 0) return null;
 
   return (
-    <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
+    <div className="fixed inset-0 pointer-events-none z-50">
       {remoteCursors.map((cursor) => {
         const color = colorForMember(cursor.memberId);
         return (

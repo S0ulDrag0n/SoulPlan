@@ -186,11 +186,12 @@ export default function Home() {
   }, [setBoardState]);
 
   // ─── Cursor tracking for realtime ──────────────────────────
+  // Send viewport (clientX/clientY) coordinates so the fixed-position
+  // CursorOverlay can render at the right spot on screen regardless of
+  // pan/scroll state.
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!session || !selectedProjectId) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    // Compute position relative to the board container (pan-space approx)
-    sendCursor(e.clientX - rect.left, e.clientY - rect.top);
+    sendCursor(e.clientX, e.clientY);
   }, [session, selectedProjectId, sendCursor]);
 
   const handleAddTask = useCallback(async (sprintId: string) => {
@@ -482,6 +483,9 @@ export default function Home() {
                   onDelete={handleDeleteNoteConnection}
                 />
 
+                {/* Realtime remote cursors overlay — fixed-position, outside
+                    the pannable area so it never gets clipped or transformed. */}
+
                 {/* Sticky notes layer — sibling of the releases row, inside
                     the same container so they pan together and share coords. */}
                 <NoteLayer
@@ -491,13 +495,14 @@ export default function Home() {
                   onDelete={handleDeleteSticky}
                   onColorCycle={handleColorCycleSticky}
                 />
-
-                {/* Realtime remote cursors overlay */}
-                {session && selectedProjectId ? (
-                  <CursorOverlay cursors={cursors} selfMemberId={session.memberId} />
-                ) : null}
               </div>
             </PanCanvas>
+
+            {/* CursorOverlay outside PanCanvas — fixed to viewport so
+                cursors are never clipped by overflow-hidden containers. */}
+            {session && selectedProjectId ? (
+              <CursorOverlay cursors={cursors} selfMemberId={session.memberId} />
+            ) : null}
 
             {/* DragOverlay outside PanCanvas so it's not affected by pan transform */}
             <DragOverlay>

@@ -1,49 +1,44 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import * as api from '@/lib/api';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function JoinPage() {
-  const { session, login, joinAsGuest } = useAuth();
+function JoinPageContent() {
+  const { session } = useAuth();
   const router = useRouter();
-  const [token, setToken] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token');
   const [preview, setPreview] = useState<{ projectName: string; role: string; projectId: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Extract token from URL on mount
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const t = params.get('token');
-    if (!t) {
-      setError('Missing invite token. Check your share link.');
-      setLoading(false);
-      return;
-    }
-    setToken(t);
-  }, []);
-
-  // Preview invite info
-  const previewInvite = useCallback(async (t: string) => {
+  // Preview invite info — fires once when we have a token
+  const loadPreview = useCallback(async (t: string) => {
     try {
       const info = await api.previewInvite(t);
       setPreview(info);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid or expired invite link');
+      // Surface the actual API error rather than a generic message
+      const msg = err instanceof Error ? err.message : 'Failed to load invite';
+      setError(msg);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (token) previewInvite(token);
-  }, [token, previewInvite]);
+    if (!token) {
+      setError('Missing invite token. Check your share link.');
+      setLoading(false);
+      return;
+    }
+    loadPreview(token);
+  }, [token, loadPreview]);
 
-  // If already logged in, show option to accept with current session or create new guest
   const handleAccept = async () => {
     if (!token || !name.trim()) return;
     setBusy(true);
@@ -134,5 +129,17 @@ export default function JoinPage() {
         ) : null}
       </div>
     </div>
+  );
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <div className="text-gray-400">Loading...</div>
+      </div>
+    }>
+      <JoinPageContent />
+    </Suspense>
   );
 }

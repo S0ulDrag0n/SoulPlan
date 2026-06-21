@@ -53,7 +53,9 @@ export default function JoinPage() {
       // Store the session
       localStorage.setItem('soulplan-session-token', result.session.token);
       localStorage.setItem('soulplan-session-info', JSON.stringify(result.session));
-      // Redirect to the main app — the project will be in their project list
+      // Land on the project they just joined, not a blank board
+      localStorage.setItem('soulplan-selected-project', result.project.id);
+      // Redirect to the main app
       router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join project');

@@ -6,8 +6,61 @@
 export interface Board {
   id: string;
   name: string;
+  projectId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  ownerId: string | null;
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type MemberType = 'user' | 'guest';
+export type MemberRole = 'owner' | 'editor' | 'viewer';
+
+export interface User {
+  id: string;
+  username: string;
+  displayName: string | null;
+  createdAt: string;
+}
+
+export interface Guest {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface ProjectMember {
+  id: string;
+  projectId: string;
+  memberType: MemberType;
+  memberId: string;
+  role: MemberRole;
+  createdAt: string;
+}
+
+/** Shareable invite link for a project. */
+export interface ProjectInvite {
+  id: string;
+  projectId: string;
+  token: string;
+  role: MemberRole;
+  createdAt: string;
+  expiresAt: string | null;
+}
+
+/** Session info returned by the auth API and stored client-side. */
+export interface Session {
+  token: string;
+  memberType: MemberType;
+  memberId: string;
+  displayName: string;
 }
 
 export interface Release {
@@ -171,4 +224,44 @@ export interface CreateNoteConnectionInput {
   noteId: string;
   toType: NoteConnectionTargetType;
   toId: string;
+}
+
+// ─── Project / Auth input types ────────────────────────────
+
+/** Input shape for creating a project. */
+export interface CreateProjectInput {
+  name: string;
+}
+
+/** Input shape for updating a project. */
+export interface UpdateProjectInput {
+  id: string;
+  name?: string;
+  isArchived?: boolean;
+}
+
+/** Input shape for user registration. */
+export interface RegisterInput {
+  username: string;
+  password: string;
+  displayName?: string;
+}
+
+/** Input shape for user login. */
+export interface LoginInput {
+  username: string;
+  password: string;
+}
+
+/** Input shape for guest join. */
+export interface JoinAsGuestInput {
+  name: string;
+}
+
+/** Input shape for adding a project member. */
+export interface AddProjectMemberInput {
+  projectId: string;
+  memberType: MemberType;
+  memberId: string;
+  role?: MemberRole;
 }

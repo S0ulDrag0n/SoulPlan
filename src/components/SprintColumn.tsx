@@ -46,7 +46,7 @@ export default function SprintColumn({
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200 truncate">{sprint.name}</h3>
           <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded shrink-0">
-            {usedCapacity}/{sprint.capacity}{sprint.capacityUnit}
+            {usedCapacity}/{sprint.capacity} {sprint.capacityUnit}
           </span>
         </div>
         {dateRange && (

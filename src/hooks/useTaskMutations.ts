@@ -8,7 +8,8 @@ import * as api from '@/lib/api';
 export function useTaskMutations(
   boardState: BoardState | null,
   onBoardUpdate: () => void,
-  setBoardState: (state: BoardState) => void
+  setBoardState: (state: BoardState) => void,
+  projectId?: string | null,
 ) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,12 +57,12 @@ export function useTaskMutations(
           id: taskId,
           sprintId: targetSprintId,
           position: movedTask?.position ?? 0,
-        });
+        }, projectId ?? undefined);
       }
 
       // Update positions for all tasks in target sprint sequentially
       for (const t of targetSprint.tasks) {
-        await api.updateTask({ id: t.id, position: t.position });
+        await api.updateTask({ id: t.id, position: t.position }, projectId ?? undefined);
       }
 
       // Re-index source sprint if cross-sprint move
@@ -71,7 +72,7 @@ export function useTaskMutations(
           .find(s => s.id === sourceSprintId);
         if (sourceSprint) {
           for (const t of sourceSprint.tasks) {
-            await api.updateTask({ id: t.id, position: t.position });
+            await api.updateTask({ id: t.id, position: t.position }, projectId ?? undefined);
           }
         }
       }
@@ -118,7 +119,7 @@ export function useTaskMutations(
     try {
       setSaving(true);
       for (const u of positionUpdates) {
-        await api.updateTask({ id: u.id, position: u.position });
+        await api.updateTask({ id: u.id, position: u.position }, projectId ?? undefined);
       }
       onBoardUpdate();
     } catch (err) {
@@ -132,7 +133,7 @@ export function useTaskMutations(
   const createTask = async (sprintId: string, title: string) => {
     try {
       setSaving(true);
-      await api.createTask({ sprintId, title });
+      await api.createTask({ sprintId, title }, projectId ?? undefined);
       onBoardUpdate();
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to create task');
@@ -152,7 +153,7 @@ export function useTaskMutations(
     };
     try {
       setSaving(true);
-      await api.updateTask(updates);
+      await api.updateTask(updates, projectId ?? undefined);
       onBoardUpdate();
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to save task');
@@ -165,7 +166,7 @@ export function useTaskMutations(
   const deleteTask = async (id: string) => {
     try {
       setSaving(true);
-      await api.deleteTask(id);
+      await api.deleteTask(id, projectId ?? undefined);
       onBoardUpdate();
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to delete task');

@@ -81,6 +81,45 @@
 
 ## Architecture
 - **Stack**: Next.js 16 App Router (Turbopack), sql.js (WASM), Tailwind CSS v4, dnd-kit
-- **Database**: V4 migration adds `sticky_notes` (board-anchored, free-positioned) + `note_connections` (polymorphic FK-less, application-level cascade)
+- **Database**: V6 migration adds users, guests, project_members, sessions tables; V5 adds projects table + project_id on boards
 - **State**: React state + optimistic updates + background API sync
+- **Realtime**: SSE (Server-Sent Events) via in-memory EventBus singleton — no WebSocket libraries
+- **Auth**: scrypt password hashing (Node.js crypto), session tokens stored in DB
 - **Build Note**: Root-owned repo — push via GitHub MCP API only, never `mcp_github_push_files` (corrupts JSX)
+
+## Multi-Project + Users/Guests + Realtime Collaboration ✅
+
+### Multiple Projects ✅
+- Projects are the new top-level entity containing boards
+- V5 migration: projects table + project_id column on boards
+- ProjectSwitcher dropdown in header for switching between projects
+- Project CRUD API: GET/POST /api/projects, GET/PATCH/DELETE /api/projects/[id]
+- /api/board endpoint accepts ?boardId= and ?projectId= params
+- Backward compatible: unauthenticated users get the default project/board
+
+### Users and Guests ✅
+- Users have passwords (scrypt hash), guests have names only
+- V6 migration: users, guests, project_members, sessions tables
+- Auth API: POST /api/auth (register/login/guest), GET (verify), DELETE (logout)
+- AuthProvider context manages session state via localStorage
+- AuthForm component: tabbed login/register/guest-join modal
+- Only users can create projects (guests get 403)
+- Project members API: GET/POST /api/projects/[id]/members, DELETE member
+- Session token sent as Bearer header with all API requests
+- Header shows current user/guest name + logout button
+
+### Realtime Collaboration ✅
+- Server-Sent Events (SSE) — no WebSocket libraries needed
+- EventBus singleton: in-memory map of project → connected SSE clients
+- SSE endpoint: GET /api/realtime/events?projectId=X (force-dynamic, text/event-stream)
+- Cursor endpoint: POST /api/realtime/cursor — broadcast { x, y } to project
+- Presence endpoint: POST /api/realtime/presence (join/leave), GET (list)
+- Editing endpoint: POST /api/realtime/editing — broadcast editing indicators
+- useRealtime hook: connects to SSE, tracks cursors/presence/editing
+  - Throttled cursor sending (~50ms), stale cursor cleanup (10s timeout)
+  - Presence join/leave, editing indicators with 30s expiry
+  - Token passed as query param (EventSource can't send headers)
+- CursorOverlay: colored remote cursors with name labels, smooth transitions
+- PresenceBar: avatar stack in header showing who's online with count
+- Event types: cursor, presence (join/leave), editing, board-update
+- All realtime endpoints require authentication

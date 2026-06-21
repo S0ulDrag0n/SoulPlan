@@ -5,6 +5,8 @@ import type { IDatabase } from './adapter';
 import type {
   BoardRow, ReleaseRow, SprintRow, TaskRow, DependencyRow,
   StickyNoteRow, NoteConnectionRow, NoteConnectionTargetType,
+  ProjectRow, UserRow, GuestRow, ProjectMemberRow, ProjectInviteRow, SessionRow,
+  MemberType, MemberRole,
 } from './types';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -38,11 +40,51 @@ async function initialize(): Promise<SqlJsDatabase> {
   }
 
   db.run('PRAGMA foreign_keys = ON');
-  migrate(db);
-  migrateV2(db);
-  migrateV3(db);
-  migrateV4(db);
+  runMigrations(db);
   return db;
+}
+
+// ─── Versioned migration runner ───────────────────────────
+// Each migration is gated by a version number stored in schema_migrations.
+// Only migrations that haven't been applied yet will run, and each is
+// recorded as applied in a single transaction. Existing DBs that predate
+// the versioning system will have all current migrations applied on the
+// first run (they're idempotent, so no-op) and then tracked from there.
+
+const MIGRATIONS: { version: number; fn: (db: SqlJsDatabase) => void }[] = [
+  { version: 1, fn: migrate },
+  { version: 2, fn: migrateV2 },
+  { version: 3, fn: migrateV3 },
+  { version: 4, fn: migrateV4 },
+  { version: 5, fn: migrateV5 },
+  { version: 6, fn: migrateV6 },
+  { version: 7, fn: migrateV7 },
+  { version: 8, fn: migrateV8 },
+];
+
+function runMigrations(db: SqlJsDatabase): void {
+  // Create the tracking table if it doesn't exist yet.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version INTEGER PRIMARY KEY,
+      applied_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  // Collect already-applied versions.
+  const applied = new Set<number>();
+  const rows = getAll(db, 'SELECT version FROM schema_migrations');
+  for (const row of rows) {
+    applied.add(row.version as number);
+  }
+
+  // Run any migration whose version hasn't been recorded yet.
+  for (const { version, fn } of MIGRATIONS) {
+    if (applied.has(version)) continue;
+    fn(db);
+    db.run('INSERT INTO schema_migrations (version) VALUES (?)', [version]);
+    saveToDisk(db);
+  }
 }
 
 function migrate(db: SqlJsDatabase): void {
@@ -167,6 +209,109 @@ function migrateV4(db: SqlJsDatabase): void {
   }
 }
 
+function migrateV5(db: SqlJsDatabase): void {
+  // Projects — new top-level entity containing boards.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      owner_id TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  // Add project_id column to boards (nullable for migration period).
+  const boardCols = getAll(db, "PRAGMA table_info(boards)");
+  const boardColNames = boardCols.map((r) => r.name as string);
+  if (!boardColNames.includes('project_id')) {
+    db.run('ALTER TABLE boards ADD COLUMN project_id TEXT');
+  }
+}
+
+function migrateV6(db: SqlJsDatabase): void {
+  // Users with passwords (scrypt hash stored as hex string).
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      display_name TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  // Guests — name only, no password.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS guests (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  // Project membership — links users or guests to projects with a role.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS project_members (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      member_type TEXT NOT NULL CHECK (member_type IN ('user', 'guest')),
+      member_id TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'editor' CHECK (role IN ('owner', 'editor', 'viewer')),
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Idempotency: one membership per (project, member) pair.
+  try {
+    db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_project_member_unique ON project_members(project_id, member_id)');
+  } catch {
+    // Existing data may have duplicates — skip gracefully
+  }
+
+  // Sessions — simple token-based auth stored in the DB.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY,
+      member_type TEXT NOT NULL CHECK (member_type IN ('user', 'guest')),
+      member_id TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+}
+
+function migrateV7(db: SqlJsDatabase): void {
+  // Add is_archived column to projects (soft-delete / archive support).
+  const projectCols = getAll(db, "PRAGMA table_info(projects)");
+  const projectColNames = projectCols.map((r) => r.name as string);
+  if (!projectColNames.includes('is_archived')) {
+    db.run("ALTER TABLE projects ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0");
+  }
+}
+
+function migrateV8(db: SqlJsDatabase): void {
+  // Project invites — shareable tokens that let guests join a project.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS project_invites (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      role TEXT NOT NULL DEFAULT 'editor' CHECK (role IN ('owner', 'editor', 'viewer')),
+      created_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+  `);
+
+  try {
+    db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_project_invite_token ON project_invites(token)');
+  } catch {
+    // Index may already exist
+  }
+}
+
 function saveToDisk(db: SqlJsDatabase): void {
   const data = db.export();
   const buffer = Buffer.from(data);
@@ -225,15 +370,206 @@ class SqlJsDataAdapter implements IDatabase {
     return getAll(this.db, 'SELECT * FROM boards') as unknown as BoardRow[];
   }
 
-  async createBoard(id: string, name: string): Promise<BoardRow> {
-    this.db.run('INSERT INTO boards (id, name) VALUES (?, ?)', [id, name]);
+  async getBoardsByProjectId(projectId: string): Promise<BoardRow[]> {
+    return getAll(
+      this.db,
+      'SELECT * FROM boards WHERE project_id = ? ORDER BY created_at',
+      [projectId]
+    ) as unknown as BoardRow[];
+  }
+
+  async createBoard(id: string, name: string, projectId: string | null = null): Promise<BoardRow> {
+    this.db.run('INSERT INTO boards (id, name, project_id) VALUES (?, ?, ?)', [id, name, projectId]);
     saveToDisk(this.db);
     const row = getOne(this.db, 'SELECT * FROM boards WHERE id = ?', [id]);
     return row as unknown as BoardRow;
   }
 
+  async updateBoardName(id: string, name: string): Promise<void> {
+    this.db.run('UPDATE boards SET name = ?, updated_at = datetime(\'now\') WHERE id = ?', [name, id]);
+    saveToDisk(this.db);
+  }
+
   async updateBoardUpdatedAt(id: string): Promise<void> {
     this.db.run("UPDATE boards SET updated_at = datetime('now') WHERE id = ?", [id]);
+    saveToDisk(this.db);
+  }
+
+  // ─── Projects ─────────────────────────────────────────────
+
+  async getProject(id: string): Promise<ProjectRow | undefined> {
+    const row = getOne(this.db, 'SELECT * FROM projects WHERE id = ?', [id]);
+    return row as unknown as ProjectRow | undefined;
+  }
+
+  async getAllProjects(includeArchived: boolean = false): Promise<ProjectRow[]> {
+    const sql = includeArchived
+      ? 'SELECT * FROM projects ORDER BY created_at'
+      : 'SELECT * FROM projects WHERE is_archived = 0 ORDER BY created_at';
+    return getAll(this.db, sql) as unknown as ProjectRow[];
+  }
+
+  async getArchivedProjects(): Promise<ProjectRow[]> {
+    return getAll(this.db, 'SELECT * FROM projects WHERE is_archived = 1 ORDER BY created_at') as unknown as ProjectRow[];
+  }
+
+  async createProject(id: string, name: string, ownerId: string | null = null): Promise<ProjectRow> {
+    this.db.run('INSERT INTO projects (id, name, owner_id) VALUES (?, ?, ?)', [id, name, ownerId]);
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM projects WHERE id = ?', [id]);
+    return row as unknown as ProjectRow;
+  }
+
+  async updateProject(id: string, fields: Record<string, unknown>): Promise<void> {
+    const allowedKeys = ['name', 'owner_id'] as const;
+    const sets: string[] = [];
+    const values: SqlValue[] = [];
+    for (const [key, value] of Object.entries(fields)) {
+      if ((allowedKeys as readonly string[]).includes(key)) {
+        sets.push(`${key} = ?`);
+        values.push(value as SqlValue);
+      }
+    }
+    if (sets.length === 0) return;
+    sets.push("updated_at = datetime('now')");
+    values.push(id);
+    this.db.run(`UPDATE projects SET ${sets.join(', ')} WHERE id = ?`, values);
+    saveToDisk(this.db);
+  }
+
+  async deleteProject(id: string): Promise<void> {
+    // Clean up boards' project_id references before deleting (boards are not FK-cascade).
+    this.db.run('UPDATE boards SET project_id = NULL WHERE project_id = ?', [id]);
+    this.db.run('DELETE FROM projects WHERE id = ?', [id]);
+    saveToDisk(this.db);
+  }
+
+  // ─── Users ────────────────────────────────────────────────
+
+  async getUser(id: string): Promise<UserRow | undefined> {
+    const row = getOne(this.db, 'SELECT * FROM users WHERE id = ?', [id]);
+    return row as unknown as UserRow | undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<UserRow | undefined> {
+    const row = getOne(this.db, 'SELECT * FROM users WHERE username = ?', [username]);
+    return row as unknown as UserRow | undefined;
+  }
+
+  async createUser(id: string, username: string, passwordHash: string, displayName: string | null = null): Promise<UserRow> {
+    this.db.run('INSERT INTO users (id, username, password_hash, display_name) VALUES (?, ?, ?, ?)', [id, username, passwordHash, displayName]);
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM users WHERE id = ?', [id]);
+    return row as unknown as UserRow;
+  }
+
+  // ─── Guests ───────────────────────────────────────────────
+
+  async getGuest(id: string): Promise<GuestRow | undefined> {
+    const row = getOne(this.db, 'SELECT * FROM guests WHERE id = ?', [id]);
+    return row as unknown as GuestRow | undefined;
+  }
+
+  async createGuest(id: string, name: string): Promise<GuestRow> {
+    this.db.run('INSERT INTO guests (id, name) VALUES (?, ?)', [id, name]);
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM guests WHERE id = ?', [id]);
+    return row as unknown as GuestRow;
+  }
+
+  // ─── Project Members ──────────────────────────────────────
+
+  async getProjectMembers(projectId: string): Promise<ProjectMemberRow[]> {
+    return getAll(
+      this.db,
+      'SELECT * FROM project_members WHERE project_id = ? ORDER BY created_at',
+      [projectId]
+    ) as unknown as ProjectMemberRow[];
+  }
+
+  async getProjectsByMemberId(memberId: string, includeArchived: boolean = false): Promise<ProjectRow[]> {
+    // includeArchived=true  → return ONLY archived projects the member belongs to
+    // includeArchived=false → return ONLY active (non-archived) projects
+    const archFilter = includeArchived ? 'AND p.is_archived = 1' : 'AND p.is_archived = 0';
+    return getAll(
+      this.db,
+      `SELECT p.* FROM projects p
+       INNER JOIN project_members pm ON pm.project_id = p.id
+       WHERE pm.member_id = ? ${archFilter}
+       ORDER BY p.created_at`,
+      [memberId]
+    ) as unknown as ProjectRow[];
+  }
+
+  async addProjectMember(id: string, projectId: string, memberType: MemberType, memberId: string, role: MemberRole): Promise<ProjectMemberRow> {
+    this.db.run(
+      'INSERT INTO project_members (id, project_id, member_type, member_id, role) VALUES (?, ?, ?, ?, ?)',
+      [id, projectId, memberType, memberId, role]
+    );
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM project_members WHERE id = ?', [id]);
+    return row as unknown as ProjectMemberRow;
+  }
+
+  async removeProjectMember(id: string): Promise<void> {
+    this.db.run('DELETE FROM project_members WHERE id = ?', [id]);
+    saveToDisk(this.db);
+  }
+
+  async findProjectMember(projectId: string, memberId: string): Promise<ProjectMemberRow | undefined> {
+    const row = getOne(
+      this.db,
+      'SELECT * FROM project_members WHERE project_id = ? AND member_id = ?',
+      [projectId, memberId]
+    );
+    return row as unknown as ProjectMemberRow | undefined;
+  }
+
+  // ─── Project Invites ─────────────────────────────────────
+
+  async createInvite(id: string, projectId: string, token: string, role: MemberRole, expiresAt: string | null): Promise<ProjectInviteRow> {
+    this.db.run(
+      'INSERT INTO project_invites (id, project_id, token, role, expires_at) VALUES (?, ?, ?, ?, ?)',
+      [id, projectId, token, role, expiresAt]
+    );
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM project_invites WHERE id = ?', [id]);
+    return row as unknown as ProjectInviteRow;
+  }
+
+  async getInviteByToken(token: string): Promise<ProjectInviteRow | undefined> {
+    const row = getOne(this.db, 'SELECT * FROM project_invites WHERE token = ?', [token]);
+    return row as unknown as ProjectInviteRow | undefined;
+  }
+
+  async getInvitesByProjectId(projectId: string): Promise<ProjectInviteRow[]> {
+    return getAll(this.db, 'SELECT * FROM project_invites WHERE project_id = ? ORDER BY created_at', [projectId]) as unknown as ProjectInviteRow[];
+  }
+
+  async deleteInvite(id: string): Promise<void> {
+    this.db.run('DELETE FROM project_invites WHERE id = ?', [id]);
+    saveToDisk(this.db);
+  }
+
+  // ─── Sessions ─────────────────────────────────────────────
+
+  async createSession(token: string, memberType: MemberType, memberId: string, displayName: string): Promise<SessionRow> {
+    this.db.run(
+      'INSERT INTO sessions (token, member_type, member_id, display_name) VALUES (?, ?, ?, ?)',
+      [token, memberType, memberId, displayName]
+    );
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM sessions WHERE token = ?', [token]);
+    return row as unknown as SessionRow;
+  }
+
+  async getSession(token: string): Promise<SessionRow | undefined> {
+    const row = getOne(this.db, 'SELECT * FROM sessions WHERE token = ?', [token]);
+    return row as unknown as SessionRow | undefined;
+  }
+
+  async deleteSession(token: string): Promise<void> {
+    this.db.run('DELETE FROM sessions WHERE token = ?', [token]);
     saveToDisk(this.db);
   }
 

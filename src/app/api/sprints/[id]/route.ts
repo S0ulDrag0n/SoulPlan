@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as q from '@/lib/queries';
+import { broadcastBoardUpdate } from '@/lib/realtime/broadcast';
 
 export async function PATCH(
   req: NextRequest,
@@ -7,8 +8,9 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const body = await req.json();
+    const { projectId, ...body } = await req.json();
     await q.updateSprint({ id, ...body });
+    broadcastBoardUpdate(projectId, 'sprint-updated');
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('PATCH /api/sprints/[id] error:', error);
@@ -17,12 +19,14 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
+    const { projectId } = await req.json().catch(() => ({}));
     await q.deleteSprint(id);
+    broadcastBoardUpdate(projectId, 'sprint-deleted');
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('DELETE /api/sprints/[id] error:', error);

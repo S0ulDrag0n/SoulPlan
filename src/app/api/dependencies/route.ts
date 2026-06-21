@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as q from '@/lib/queries';
+import { broadcastBoardUpdate } from '@/lib/realtime/broadcast';
 
 // POST /api/dependencies — create a dependency (fromTaskId → toTaskId meaning "from blocks to")
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { fromTaskId, toTaskId } = body;
+    const { fromTaskId, toTaskId, projectId } = body;
     if (!fromTaskId || !toTaskId) {
       return NextResponse.json({ error: 'fromTaskId and toTaskId required' }, { status: 400 });
     }
@@ -18,6 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Dependency already exists' }, { status: 409 });
     }
     const dep = await q.createDependency(fromTaskId, toTaskId);
+    broadcastBoardUpdate(projectId, 'dependency-created');
     return NextResponse.json(dep);
   } catch (error) {
     console.error('POST /api/dependencies error:', error);
@@ -28,11 +30,12 @@ export async function POST(req: NextRequest) {
 // DELETE /api/dependencies — delete a dependency by id
 export async function DELETE(req: NextRequest) {
   try {
-    const { id } = await req.json();
+    const { id, projectId } = await req.json();
     if (!id) {
       return NextResponse.json({ error: 'id required' }, { status: 400 });
     }
     await q.deleteDependency(id);
+    broadcastBoardUpdate(projectId, 'dependency-deleted');
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('DELETE /api/dependencies error:', error);

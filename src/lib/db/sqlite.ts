@@ -385,6 +385,11 @@ class SqlJsDataAdapter implements IDatabase {
     return row as unknown as BoardRow;
   }
 
+  async updateBoardName(id: string, name: string): Promise<void> {
+    this.db.run('UPDATE boards SET name = ?, updated_at = datetime(\'now\') WHERE id = ?', [name, id]);
+    saveToDisk(this.db);
+  }
+
   async updateBoardUpdatedAt(id: string): Promise<void> {
     this.db.run("UPDATE boards SET updated_at = datetime('now') WHERE id = ?", [id]);
     saveToDisk(this.db);

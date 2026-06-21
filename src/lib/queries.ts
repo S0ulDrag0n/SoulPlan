@@ -84,6 +84,11 @@ export async function createDefaultBoardForProject(projectId: string): Promise<B
   return state;
 }
 
+export async function updateBoardName(boardId: string, name: string): Promise<void> {
+  const db: IDatabase = await getDb();
+  await db.updateBoardName(boardId, name);
+}
+
 // ─── Release queries ─────────────────────────────────────
 
 export async function createRelease(input: CreateReleaseInput): Promise<Release> {

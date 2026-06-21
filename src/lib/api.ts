@@ -41,6 +41,13 @@ export function fetchBoard(projectId?: string): Promise<BoardState> {
   return request<BoardState>(`/board${qs}`);
 }
 
+export function updateBoardName(boardId: string, name: string, projectId?: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/board/${boardId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name, ...(projectId ? { projectId } : {}) }),
+  });
+}
+
 // ─── Releases ─────────────────────────────────────────────
 
 export function createRelease(input: CreateReleaseInput, projectId?: string): Promise<unknown> {

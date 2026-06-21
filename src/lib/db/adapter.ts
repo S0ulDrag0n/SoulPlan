@@ -21,6 +21,7 @@ export interface IDatabase {
   getAllBoards(): Promise<BoardRow[]>;
   getBoardsByProjectId(projectId: string): Promise<BoardRow[]>;
   createBoard(id: string, name: string, projectId?: string | null): Promise<BoardRow>;
+  updateBoardName(id: string, name: string): Promise<void>;
   updateBoardUpdatedAt(id: string): Promise<void>;
 
   // ─── Projects ─────────────────────────────────────────────

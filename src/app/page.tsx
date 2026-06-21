@@ -18,6 +18,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import AuthForm from '@/components/AuthForm';
 import ProjectSwitcher from '@/components/ProjectSwitcher';
 import ShareDialog from '@/components/ShareDialog';
+import BoardTitle from '@/components/BoardTitle';
 import CursorOverlay from '@/components/CursorOverlay';
 import PresenceBar from '@/components/PresenceBar';
 import { useAuth } from '@/components/AuthProvider';
@@ -25,7 +26,7 @@ import { useBoard } from '@/hooks/useBoard';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
 import { useRealtime } from '@/hooks/useRealtime';
 import { findTaskById, resolveDropTarget } from '@/lib/transform';
-import type { Task, Release, Sprint, StickyNote as StickyNoteModel, NoteConnectionTargetType, Project } from '@/lib/types';
+import type { Task, Release, Sprint, StickyNote as StickyNoteModel, NoteConnectionTargetType, Project, MemberRole } from '@/lib/types';
 import * as api from '@/lib/api';
 
 const STICKY_COLORS = ['yellow', 'pink', 'blue', 'green', 'purple'] as const;
@@ -65,6 +66,7 @@ export default function Home() {
   const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
   const [showAuthForm, setShowAuthForm] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [userRole, setUserRole] = useState<MemberRole | null>(null);
   const [jumpPan, setJumpPan] = useState<{ x: number; y: number } | null>(null);
 
   // Ref to always-read-latest boardState in async DnD handlers
@@ -85,6 +87,27 @@ export default function Home() {
       reload();
     }, 300);
   }, [reload]);
+
+  // Fetch the current user's role in the selected project.
+  const isOwner = userRole === 'owner';
+  useEffect(() => {
+    if (session && selectedProjectId) {
+      api.fetchProjectMembers(selectedProjectId)
+        .then((members) => {
+          const me = members.find((m) => m.memberId === session.memberId);
+          setUserRole(me?.role ?? null);
+        })
+        .catch(() => setUserRole(null));
+    } else {
+      setUserRole(null);
+    }
+  }, [session, selectedProjectId]);
+
+  const handleRenameBoard = useCallback(async (name: string) => {
+    if (!boardState || !selectedProjectId) return;
+    await api.updateBoardName(boardState.board.id, name, selectedProjectId);
+    setBoardState({ ...boardState, board: { ...boardState.board, name } });
+  }, [boardState, selectedProjectId, setBoardState]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -434,14 +457,14 @@ export default function Home() {
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
           <ProjectSwitcher currentProjectId={selectedProjectId} onSelectProject={handleSelectProject} />
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{boardState.board.name}</h1>
+          <BoardTitle boardState={boardState} isOwner={isOwner} onRename={handleRenameBoard} />
         </div>
         <div className="flex items-center gap-3">
           {saving ? <span className="text-sm text-gray-400 dark:text-gray-500">Saving...</span> : null}
           {session && selectedProjectId ? (
             <PresenceBar presence={presence} selfMemberId={session.memberId} />
           ) : null}
-          {session && selectedProjectId ? (
+          {session && selectedProjectId && isOwner ? (
             <button
               onClick={() => setShowShareDialog(true)}
               className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1"

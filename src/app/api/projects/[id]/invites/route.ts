@@ -38,10 +38,10 @@ export async function POST(
     const session = await requireAuth(req);
     const { id: projectId } = await params;
 
-    // Only owners or editors can create invites
+    // Only owners can create share links
     const role = await getMemberRole(projectId, session.memberId);
-    if (role !== 'owner' && role !== 'editor') {
-      return NextResponse.json({ error: 'Only project owners or editors can create share links' }, { status: 403 });
+    if (role !== 'owner') {
+      return NextResponse.json({ error: 'Only project owners can create share links' }, { status: 403 });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -58,7 +58,7 @@ export async function POST(
   }
 }
 
-// DELETE /api/projects/[id]/invites — revoke a share link (owners/editors only)
+// DELETE /api/projects/[id]/invites — revoke a share link (owners only)
 // Body: { inviteId: string }
 export async function DELETE(
   req: NextRequest,
@@ -69,8 +69,8 @@ export async function DELETE(
     const { id: projectId } = await params;
 
     const role = await getMemberRole(projectId, session.memberId);
-    if (role !== 'owner' && role !== 'editor') {
-      return NextResponse.json({ error: 'Only project owners or editors can revoke share links' }, { status: 403 });
+    if (role !== 'owner') {
+      return NextResponse.json({ error: 'Only project owners can revoke share links' }, { status: 403 });
     }
 
     const body = await req.json();

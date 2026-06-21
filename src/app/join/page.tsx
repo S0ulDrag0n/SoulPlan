@@ -6,7 +6,7 @@ import * as api from '@/lib/api';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 function JoinPageContent() {
-  const { session } = useAuth();
+  const { session, setSessionDirect } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -50,6 +50,10 @@ function JoinPageContent() {
       localStorage.setItem('soulplan-session-info', JSON.stringify(result.session));
       // Land on the project they just joined, not a blank board
       localStorage.setItem('soulplan-selected-project', result.project.id);
+      // Update React state directly so AuthProvider knows about the session
+      // immediately — without this, useRealtime sees session=null and never
+      // connects SSE until a manual page refresh.
+      setSessionDirect(result.session);
       // Redirect to the main app
       router.push('/');
     } catch (err) {

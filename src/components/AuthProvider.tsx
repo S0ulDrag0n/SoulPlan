@@ -14,6 +14,8 @@ interface AuthContextValue {
   register: (username: string, password: string, displayName?: string) => Promise<void>;
   joinAsGuest: (name: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Directly set the session (used by join page after accepting an invite). */
+  setSessionDirect: (session: Session) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -70,8 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }, []);
 
+  const setSessionDirect = useCallback((newSession: Session) => {
+    setSession(newSession);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ session, loading, login, register, joinAsGuest, logout }}>
+    <AuthContext.Provider value={{ session, loading, login, register, joinAsGuest, logout, setSessionDirect }}>
       {children}
     </AuthContext.Provider>
   );

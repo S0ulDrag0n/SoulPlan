@@ -54,7 +54,11 @@ export function useRealtime(
   useEffect(() => {
     if (!projectId || !session) return;
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('soulplan-session-token') : null;
+    // Use the token from the session object, NOT from localStorage.
+    // localStorage is shared across tabs — if a guest joins in another tab,
+    // it overwrites the token, causing this tab to connect with the wrong
+    // identity (the guest's memberId) and cursors get filtered out.
+    const token = session.token;
     if (!token) return;
 
     // EventSource doesn't support custom headers, so pass token as query param
@@ -172,7 +176,7 @@ export function useRealtime(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...authHeader(),
+          Authorization: `Bearer ${session.token}`,
         },
         body: JSON.stringify({ projectId, x, y }),
       }).catch(() => { /* ignore errors */ });
@@ -186,16 +190,11 @@ export function useRealtime(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...authHeader(),
+        Authorization: `Bearer ${session.token}`,
       },
       body: JSON.stringify({ projectId, target, targetId }),
     }).catch(() => { /* ignore errors */ });
   }, [projectId, session]);
 
   return { cursors, presence, editing, sendCursor, sendEditing };
-}
-
-function authHeader(): Record<string, string> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('soulplan-session-token') : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import SprintColumn from './SprintColumn';
-import type { Dependency, Release, ReleaseWithSprints } from '@/lib/types';
+import type { Dependency, Release, ReleaseWithSprints, Task } from '@/lib/types';
 
 interface ReleaseBlockProps {
   release: ReleaseWithSprints;
@@ -9,7 +9,7 @@ interface ReleaseBlockProps {
   onEditRelease: (release: Release) => void;
   onDeleteRelease: (id: string) => void;
   onAddTask: (sprintId: string) => void;
-  onEditTask: (task: import('@/lib/types').Task) => void;
+  onEditTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onEditSprint: (sprint: import('@/lib/types').Sprint) => void;
   onDeleteSprint: (id: string) => void;
@@ -18,12 +18,13 @@ interface ReleaseBlockProps {
   onSelectTask?: (task: import('@/lib/types').Task) => void;
   dimmedTaskIds?: Set<string> | null;
   editingByTask?: Map<string, string> | null;
+  onMatchTasks?: (task: Task) => void;
 }
 
 export default function ReleaseBlock({
   release, onAddSprint, onEditRelease, onDeleteRelease,
   onAddTask, onEditTask, onDeleteTask,
-  onEditSprint, onDeleteSprint, dependencies, onJumpToTask, onSelectTask, dimmedTaskIds, editingByTask,
+  onEditSprint, onDeleteSprint, dependencies, onJumpToTask, onSelectTask, dimmedTaskIds, editingByTask, onMatchTasks,
 }: ReleaseBlockProps) {
   const targetDate = release.targetDate
     ? new Date(release.targetDate).toLocaleDateString()
@@ -74,6 +75,7 @@ export default function ReleaseBlock({
             onSelectTask={onSelectTask}
             dimmedTaskIds={dimmedTaskIds}
             editingByTask={editingByTask}
+            onMatchTasks={onMatchTasks}
           />
         ))}
 

@@ -18,11 +18,12 @@ interface SprintColumnProps {
   onSelectTask?: (task: Task) => void;
   dimmedTaskIds?: Set<string> | null;
   editingByTask?: Map<string, string> | null;
+  onMatchTasks?: (task: Task) => void;
 }
 
 export default function SprintColumn({
   sprint, tasks, dependencies, onAddTask, onEditTask, onDeleteTask,
-  onEditSprint, onDeleteSprint, onJumpToTask, onSelectTask, dimmedTaskIds, editingByTask,
+  onEditSprint, onDeleteSprint, onJumpToTask, onSelectTask, dimmedTaskIds, editingByTask, onMatchTasks,
 }: SprintColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: sprint.id,
@@ -99,6 +100,7 @@ export default function SprintColumn({
                 onSelect={onSelectTask}
                 dimmed={dimmedTaskIds?.has(task.id) ?? false}
                 editingBy={editingByTask?.get(task.id) ?? null}
+                onMatch={onMatchTasks}
               />
             );
           })}

@@ -71,6 +71,7 @@ export interface Release {
   targetDate: string | null;
   notes: string | null;
   createdAt: string;
+  jiraReleaseId?: string | null;
 }
 
 export interface Sprint {
@@ -84,6 +85,7 @@ export interface Sprint {
   endDate: string | null;
   notes: string | null;
   createdAt: string;
+  jiraSprintId?: string | null;
 }
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -101,6 +103,9 @@ export interface Task {
   assigneeId: string | null;
   priority: TaskPriority;
   updatedAt: string | null;
+  jiraIssueKey?: string | null;
+  jiraIssueId?: string | null;
+  jiraStatus?: string | null;
 }
 
 export interface Dependency {
@@ -312,4 +317,67 @@ export interface TaskFilter {
   sprintId?: string;
   /** When true, show only tasks that have a Jira issue link */
   hasJira?: boolean;
+}
+
+// ─── Jira types ──────────────────────────────────────────────
+
+export type JiraType = 'cloud' | 'server';
+
+export interface JiraConfig {
+  id: string;
+  projectId: string;
+  baseUrl: string;
+  email: string | null;
+  jiraType: JiraType;
+  boardId: string | null;
+  autoSync: boolean;
+  lastSyncedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JiraSyncLog {
+  id: string;
+  projectId: string;
+  direction: 'import' | 'export';
+  entityType: string;
+  entityId: string | null;
+  jiraId: string | null;
+  action: 'created' | 'updated' | 'skipped' | 'error';
+  details: string | null;
+  createdAt: string;
+}
+
+export interface JiraSprint {
+  id: string;
+  name: string;
+  state: string;
+  startDate: string | null;
+  endDate: string | null;
+  boardId: number | null;
+}
+
+export interface JiraIssue {
+  id: string;
+  key: string;
+  summary: string;
+  status: string;
+  storyPoints: number | null;
+  sprintId: string | null;
+  assignee: string | null;
+}
+
+export interface UpdateJiraConfigInput {
+  baseUrl?: string;
+  email?: string | null;
+  apiToken?: string | null;
+  jiraType?: JiraType;
+  boardId?: string | null;
+  autoSync?: boolean;
+}
+
+export interface LinkJiraInput {
+  jiraId: string;
+  entityType: 'release' | 'sprint' | 'task';
+  entityId: string;
 }

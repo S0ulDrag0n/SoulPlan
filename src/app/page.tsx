@@ -21,6 +21,7 @@ import ShareDialog from '@/components/ShareDialog';
 import BoardTitle from '@/components/BoardTitle';
 import CursorOverlay from '@/components/CursorOverlay';
 import PresenceBar from '@/components/PresenceBar';
+import BurndownChart from '@/components/BurndownChart';
 import ActivityLogPanel from '@/components/ActivityLogPanel';
 import TaskDetailPanel from '@/components/TaskDetailPanel';
 import SearchBar from '@/components/SearchBar';
@@ -76,6 +77,7 @@ export default function Home() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
   const [taskFilter, setTaskFilter] = useState<TaskFilter | null>(null);
+  const [burndownSprint, setBurndownSprint] = useState<{ id: string; name: string } | null>(null);
 
   // Ref to always-read-latest boardState in async DnD handlers
   const boardStateRef = useRef(boardState);
@@ -659,6 +661,7 @@ export default function Home() {
                       onSelectTask={setSelectedTask}
                       dimmedTaskIds={dimmedTaskIds}
                       editingByTask={editingByTask}
+                      onShowBurndown={(sprintId, sprintName) => setBurndownSprint({ id: sprintId, name: sprintName })}
                     />
                   ))}
                 </div>
@@ -755,6 +758,13 @@ export default function Home() {
               sendEditing('task', selectedTask.id);
             }
           }}
+        />
+      ) : null}
+      {burndownSprint ? (
+        <BurndownChart
+          sprintId={burndownSprint.id}
+          sprintName={burndownSprint.name}
+          onClose={() => setBurndownSprint(null)}
         />
       ) : null}
     </div>

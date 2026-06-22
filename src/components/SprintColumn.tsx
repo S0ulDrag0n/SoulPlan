@@ -18,11 +18,12 @@ interface SprintColumnProps {
   onSelectTask?: (task: Task) => void;
   dimmedTaskIds?: Set<string> | null;
   editingByTask?: Map<string, string> | null;
+  onShowBurndown?: (sprintId: string, sprintName: string) => void;
 }
 
 export default function SprintColumn({
   sprint, tasks, dependencies, onAddTask, onEditTask, onDeleteTask,
-  onEditSprint, onDeleteSprint, onJumpToTask, onSelectTask, dimmedTaskIds, editingByTask,
+  onEditSprint, onDeleteSprint, onJumpToTask, onSelectTask, dimmedTaskIds, editingByTask, onShowBurndown,
 }: SprintColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: sprint.id,
@@ -72,6 +73,14 @@ export default function SprintColumn({
           >
             Edit
           </button>
+          {onShowBurndown ? (
+            <button
+              onClick={() => onShowBurndown(sprint.id, sprint.name)}
+              className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+            >
+              📊
+            </button>
+          ) : null}
           <button
             onClick={() => onDeleteSprint(sprint.id)}
             className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"

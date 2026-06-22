@@ -86,6 +86,8 @@ export interface Sprint {
   createdAt: string;
 }
 
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
 export interface Task {
   id: string;
   sprintId: string;
@@ -96,6 +98,9 @@ export interface Task {
   isCritical: boolean;
   position: number;
   createdAt: string;
+  assigneeId: string | null;
+  priority: TaskPriority;
+  updatedAt: string | null;
 }
 
 export interface Dependency {
@@ -155,6 +160,9 @@ export type SprintWithTasks = Sprint & {
 export interface CreateTaskInput {
   sprintId: string;
   title: string;
+  description?: string;
+  assigneeId?: string;
+  priority?: TaskPriority;
 }
 
 /** Input shape for updating a task — all fields optional except id */
@@ -167,6 +175,8 @@ export interface UpdateTaskInput {
   isCritical?: boolean;
   sprintId?: string;
   position?: number;
+  assigneeId?: string | null;
+  priority?: TaskPriority;
 }
 
 /** Input shape for creating a release */

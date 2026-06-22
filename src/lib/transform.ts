@@ -8,6 +8,7 @@ import type {
   StickyNote, NoteConnection,
   SprintWithTasks,
   Project, User, Guest, ProjectMember, ProjectInvite, Session,
+  TaskPriority,
 } from './types';
 
 // ─── Row → Model transforms (pure functions) ────────────────
@@ -119,6 +120,9 @@ export function toTask(row: TaskRow): Task {
     isCritical: row.is_critical === 1,
     position: row.position,
     createdAt: row.created_at,
+    assigneeId: row.assignee_id ?? null,
+    priority: (row.priority as TaskPriority) ?? 'medium',
+    updatedAt: row.updated_at ?? null,
   };
 }
 
@@ -166,6 +170,8 @@ export function taskToRow(task: Partial<Task> & { id: string }): Record<string, 
   if (task.isCritical !== undefined) row.is_critical = task.isCritical ? 1 : 0;
   if (task.sprintId !== undefined) row.sprint_id = task.sprintId;
   if (task.position !== undefined) row.position = task.position;
+  if (task.assigneeId !== undefined) row.assignee_id = task.assigneeId;
+  if (task.priority !== undefined) row.priority = task.priority;
   return row;
 }
 

@@ -61,6 +61,7 @@ const MIGRATIONS: { version: number; fn: (db: SqlJsDatabase) => void }[] = [
   { version: 7, fn: migrateV7 },
   { version: 8, fn: migrateV8 },
   { version: 9, fn: migrateV9 },
+  { version: 10, fn: migrateV10 },
 ];
 
 function runMigrations(db: SqlJsDatabase): void {
@@ -331,6 +332,21 @@ function migrateV9(db: SqlJsDatabase): void {
   try {
     db.run('CREATE INDEX IF NOT EXISTS idx_activity_project ON activity_log(project_id, created_at DESC)');
   } catch { /* index may exist */ }
+}
+
+function migrateV10(db: SqlJsDatabase): void {
+  // Task detail panel — adds assignee, priority, and updated_at tracking.
+  const cols = getAll(db, 'PRAGMA table_info(tasks)') as Row[];
+  const colNames = new Set(cols.map(c => c.name as string));
+  if (!colNames.has('assignee_id')) {
+    db.run('ALTER TABLE tasks ADD COLUMN assignee_id TEXT');
+  }
+  if (!colNames.has('priority')) {
+    db.run("ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium'");
+  }
+  if (!colNames.has('updated_at')) {
+    db.run('ALTER TABLE tasks ADD COLUMN updated_at TEXT');
+  }
 }
 
 function saveToDisk(db: SqlJsDatabase): void {
@@ -729,8 +745,13 @@ class SqlJsDataAdapter implements IDatabase {
     return row as unknown as TaskRow;
   }
 
+  async getTask(id: string): Promise<TaskRow | undefined> {
+    const row = getOne(this.db, 'SELECT * FROM tasks WHERE id = ?', [id]);
+    return row as unknown as TaskRow | undefined;
+  }
+
   async updateTask(id: string, fields: Record<string, unknown>): Promise<void> {
-    const allowedKeys = ['title', 'description', 'estimate', 'color', 'is_critical', 'sprint_id', 'position'] as const;
+    const allowedKeys = ['title', 'description', 'estimate', 'color', 'is_critical', 'sprint_id', 'position', 'assignee_id', 'priority'] as const;
     const sets: string[] = [];
     const values: SqlValue[] = [];
     for (const [key, value] of Object.entries(fields)) {
@@ -740,6 +761,7 @@ class SqlJsDataAdapter implements IDatabase {
       }
     }
     if (sets.length === 0) return;
+    sets.push("updated_at = datetime('now')");
     values.push(id);
     this.db.run(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`, values);
     saveToDisk(this.db);

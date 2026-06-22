@@ -22,12 +22,13 @@ import BoardTitle from '@/components/BoardTitle';
 import CursorOverlay from '@/components/CursorOverlay';
 import PresenceBar from '@/components/PresenceBar';
 import ActivityLogPanel from '@/components/ActivityLogPanel';
+import TaskDetailPanel from '@/components/TaskDetailPanel';
 import { useAuth } from '@/components/AuthProvider';
 import { useBoard } from '@/hooks/useBoard';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
 import { useRealtime } from '@/hooks/useRealtime';
 import { findTaskById, resolveDropTarget } from '@/lib/transform';
-import type { Task, Release, Sprint, StickyNote as StickyNoteModel, NoteConnectionTargetType, Project, MemberRole } from '@/lib/types';
+import type { Task, Release, Sprint, StickyNote as StickyNoteModel, NoteConnectionTargetType, Project, MemberRole, ProjectMember } from '@/lib/types';
 import * as api from '@/lib/api';
 
 const STICKY_COLORS = ['yellow', 'pink', 'blue', 'green', 'purple'] as const;
@@ -69,6 +70,8 @@ export default function Home() {
   const [userRole, setUserRole] = useState<MemberRole | null>(null);
   const [jumpPan, setJumpPan] = useState<{ x: number; y: number } | null>(null);
   const [showActivityLog, setShowActivityLog] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
 
   // Ref to always-read-latest boardState in async DnD handlers
   const boardStateRef = useRef(boardState);
@@ -95,12 +98,14 @@ export default function Home() {
     if (session && selectedProjectId) {
       api.fetchProjectMembers(selectedProjectId)
         .then((members) => {
+          setProjectMembers(members);
           const me = members.find((m) => m.memberId === session.memberId);
           setUserRole(me?.role ?? null);
         })
-        .catch(() => setUserRole(null));
+        .catch(() => { setUserRole(null); setProjectMembers([]); });
     } else {
       setUserRole(null);
+      setProjectMembers([]);
     }
   }, [session, selectedProjectId]);
 
@@ -609,6 +614,7 @@ export default function Home() {
                       onDeleteSprint={handleDeleteSprint}
                       dependencies={allDependencies}
                       onJumpToTask={handleJumpToTask}
+                      onSelectTask={setSelectedTask}
                     />
                   ))}
                 </div>
@@ -687,6 +693,19 @@ export default function Home() {
         <ActivityLogPanel
           projectId={selectedProjectId}
           onClose={() => setShowActivityLog(false)}
+        />
+      ) : null}
+      {selectedTask && selectedProjectId ? (
+        <TaskDetailPanel
+          task={selectedTask}
+          projectId={selectedProjectId}
+          members={projectMembers}
+          canEdit={userRole === 'owner' || userRole === 'editor'}
+          onClose={() => setSelectedTask(null)}
+          onUpdated={(updated) => {
+            setSelectedTask(updated);
+            reload();
+          }}
         />
       ) : null}
     </div>

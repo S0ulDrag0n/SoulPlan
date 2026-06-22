@@ -73,6 +73,7 @@ export interface IDatabase {
 
   // ─── Tasks ───────────────────────────────────────────────
   getTasksBySprintIds(sprintIds: string[]): Promise<TaskRow[]>;
+  getTask(id: string): Promise<TaskRow | undefined>;
   createTask(id: string, sprintId: string, title: string, position: number): Promise<TaskRow>;
   updateTask(id: string, fields: Record<string, unknown>): Promise<void>;
   deleteTask(id: string): Promise<void>;

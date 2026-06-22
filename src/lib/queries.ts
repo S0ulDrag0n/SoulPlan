@@ -146,6 +146,12 @@ export async function updateTask(input: UpdateTaskInput): Promise<void> {
   await db.updateTask(input.id, fields);
 }
 
+export async function getTaskDetail(id: string): Promise<Task | null> {
+  const db: IDatabase = await getDb();
+  const row = await db.getTask(id);
+  return row ? toTask(row) : null;
+}
+
 export async function deleteTask(id: string): Promise<void> {
   const db: IDatabase = await getDb();
   await db.deleteTask(id);

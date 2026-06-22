@@ -8,13 +8,12 @@ import { useDependencyConnector } from './DependencyConnector';
 
 interface SortableTaskCardProps {
   task: Task;
-  /** Dependencies that have this task as the *from* (this task blocks others) */
   blockingDeps?: Dependency[];
-  /** Dependencies that have this task as the *to* (this task is blocked by others) */
   blockedByDeps?: Dependency[];
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
   onJumpToTask?: (taskId: string) => void;
+  onSelect?: (task: Task) => void;
 }
 
 export default function SortableTaskCard({
@@ -24,6 +23,7 @@ export default function SortableTaskCard({
   onEdit,
   onDelete,
   onJumpToTask,
+  onSelect,
 }: SortableTaskCardProps) {
   const {
     attributes,
@@ -59,7 +59,8 @@ export default function SortableTaskCard({
       ref={setNodeRef}
       data-task-id={task.id}
       style={style}
-      className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-sm dark:shadow-gray-900/30 p-3 mb-2 hover:shadow-md transition-shadow${
+      onClick={() => onSelect?.(task)}
+      className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-sm dark:shadow-gray-900/30 p-3 mb-2 hover:shadow-md transition-shadow cursor-pointer${
         isDropTarget ? ' ring-2 ring-green-400 dark:ring-green-500 ring-offset-1' : ''
       }`}
     >

@@ -95,6 +95,9 @@ export interface TaskRow {
   is_critical: number; // SQLite boolean 0|1
   position: number;
   created_at: string;
+  assignee_id: string | null;
+  priority: string;
+  updated_at: string | null;
 }
 
 export interface DependencyRow {

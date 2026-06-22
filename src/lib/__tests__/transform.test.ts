@@ -74,6 +74,9 @@ const taskRow: TaskRow = {
   is_critical: 0,
   position: 0,
   created_at: '2025-01-01T00:00:00Z',
+  assignee_id: null,
+  priority: 'medium',
+  updated_at: null,
 };
 
 const depRow: DependencyRow = {
@@ -168,6 +171,7 @@ function makeState(
           tasks: s.tasks.map(t => ({
             id: t.id, sprintId: t.sprintId, title: `Task ${t.id}`, description: null,
             estimate: 3, color: '#000', isCritical: false, position: t.position, createdAt: '',
+            assigneeId: null, priority: 'medium' as const, updatedAt: null,
           })),
         })),
       },
@@ -217,6 +221,7 @@ describe('toTask', () => {
     expect(toTask(taskRow)).toEqual({
       id: 't1', sprintId: 's1', title: 'Setup CI', description: null, estimate: 3,
       color: '#3b82f6', isCritical: false, position: 0, createdAt: '2025-01-01T00:00:00Z',
+      assigneeId: null, priority: 'medium', updatedAt: null,
     });
   });
 

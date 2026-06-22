@@ -117,6 +117,17 @@ export function deleteTask(id: string, projectId?: string): Promise<{ success: b
   });
 }
 
+export function fetchTaskDetail(id: string): Promise<Task> {
+  return request<Task>(`/tasks/${id}`);
+}
+
+export function updateTaskDetail(id: string, fields: Partial<UpdateTaskInput> & { projectId: string }): Promise<Task> {
+  return request<Task>(`/tasks/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ id, ...fields }),
+  });
+}
+
 // ─── Dependencies ──────────────────────────────────────────
 
 export function createDependency(fromTaskId: string, toTaskId: string, projectId?: string): Promise<Dependency> {

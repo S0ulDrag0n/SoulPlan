@@ -6,6 +6,7 @@ import {
   toBoard, toRelease, toSprint, toTask, toDependency,
   toStickyNote, toNoteConnection,
   toProject, toUser, toGuest, toProjectMember, toProjectInvite, toSession,
+  toJiraConfig, toJiraSyncLog,
   assembleBoardState, taskToRow, sprintToRow, releaseToRow,
   stickyNoteToRow, nextPosition,
 } from './transform';
@@ -21,7 +22,9 @@ import type {
   MemberType, MemberRole,
   CreateProjectInput, UpdateProjectInput,
   RegisterInput, LoginInput, JoinAsGuestInput,
+  JiraConfig, JiraSyncLog, UpdateJiraConfigInput,
 } from './types';
+import { encryptToken, decryptToken } from './jira/crypto';
 
 // ─── Board queries ────────────────────────────────────────
 
@@ -473,4 +476,66 @@ export async function acceptInvite(
   const session = await createSessionInternal(db, 'guest', guest.id, guest.name);
 
   return { guest, session, project, invite };
+}
+
+// ─── Jira queries ─────────────────────────────────────────
+
+export async function getJiraConfig(projectId: string): Promise<JiraConfig | null> {
+  const db: IDatabase = await getDb();
+  const row = await db.getJiraConfig(projectId);
+  return row ? toJiraConfig(row) : null;
+}
+
+export async function createJiraConfig(
+  projectId: string,
+  baseUrl: string,
+  jiraType: string,
+  email: string | null,
+  apiToken: string | null,
+  boardId: string | null
+): Promise<JiraConfig> {
+  const db: IDatabase = await getDb();
+  const encrypted = apiToken ? encryptToken(apiToken) : null;
+  const row = await db.createJiraConfig(randomUUID(), projectId, baseUrl, jiraType, email, encrypted, boardId);
+  return toJiraConfig(row);
+}
+
+export async function updateJiraConfigById(id: string, input: UpdateJiraConfigInput): Promise<void> {
+  const db: IDatabase = await getDb();
+  const fields: Record<string, unknown> = {};
+  if (input.baseUrl !== undefined) fields.base_url = input.baseUrl;
+  if (input.email !== undefined) fields.email = input.email;
+  if (input.jiraType !== undefined) fields.jira_type = input.jiraType;
+  if (input.boardId !== undefined) fields.board_id = input.boardId;
+  if (input.autoSync !== undefined) fields.auto_sync = input.autoSync ? 1 : 0;
+  if (input.apiToken !== undefined && input.apiToken !== null) {
+    fields.encrypted_token = encryptToken(input.apiToken);
+  }
+  await db.updateJiraConfig(id, fields);
+}
+
+export async function deleteJiraConfig(id: string): Promise<void> {
+  const db: IDatabase = await getDb();
+  await db.deleteJiraConfig(id);
+}
+
+export async function getSyncLogs(projectId: string, limit: number = 50): Promise<JiraSyncLog[]> {
+  const db: IDatabase = await getDb();
+  const rows = await db.getSyncLogs(projectId, limit);
+  return rows.map(toJiraSyncLog);
+}
+
+export async function linkReleaseToJira(releaseId: string, jiraId: string): Promise<void> {
+  const db: IDatabase = await getDb();
+  await db.updateRelease(releaseId, { jira_release_id: jiraId });
+}
+
+export async function linkSprintToJira(sprintId: string, jiraId: string): Promise<void> {
+  const db: IDatabase = await getDb();
+  await db.updateSprint(sprintId, { jira_sprint_id: jiraId });
+}
+
+export async function linkTaskToJira(taskId: string, jiraKey: string, jiraId: string | null, jiraStatus: string | null): Promise<void> {
+  const db: IDatabase = await getDb();
+  await db.updateTask(taskId, { jira_issue_key: jiraKey, jira_issue_id: jiraId, jira_status: jiraStatus });
 }

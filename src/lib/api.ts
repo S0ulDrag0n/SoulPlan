@@ -319,3 +319,65 @@ export function verifySession(): Promise<{ authenticated: boolean; session?: Ses
 export function logout(): Promise<{ success: boolean }> {
   return request('/auth', { method: 'DELETE' });
 }
+
+// ─── Jira ─────────────────────────────────────────────────
+
+import type { JiraConfig, JiraSyncLog, JiraSprint, JiraIssue, UpdateJiraConfigInput } from '@/lib/types';
+
+export function fetchJiraConfig(projectId: string): Promise<JiraConfig | { configured: false }> {
+  return request(`/projects/${projectId}/jira/config`);
+}
+
+export function createJiraConfig(projectId: string, body: {
+  baseUrl: string; jiraType?: string; email?: string | null; apiToken?: string | null; boardId?: string | null;
+}): Promise<JiraConfig> {
+  return request(`/projects/${projectId}/jira/config`, { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function updateJiraConfig(projectId: string, body: UpdateJiraConfigInput): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/projects/${projectId}/jira/config`, { method: 'PATCH', body: JSON.stringify(body) });
+}
+
+export function deleteJiraConfig(projectId: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/projects/${projectId}/jira/config`, { method: 'DELETE' });
+}
+
+export function testJiraConnection(projectId: string, body: {
+  baseUrl: string; email?: string | null; apiToken?: string; jiraType?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  return request(`/projects/${projectId}/jira/test-connection`, { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function searchJiraEpics(projectId: string): Promise<JiraIssue[]> {
+  return request(`/projects/${projectId}/jira/search-epics`);
+}
+
+export function fetchEpicIssues(projectId: string, epicKey: string): Promise<JiraIssue[]> {
+  return request(`/projects/${projectId}/jira/epic-issues?epicKey=${encodeURIComponent(epicKey)}`);
+}
+
+export function fetchJiraBoards(projectId: string): Promise<{ id: number; name: string; type: string }[]> {
+  return request(`/projects/${projectId}/jira/boards`);
+}
+
+export function fetchJiraSprints(projectId: string, boardId: number): Promise<JiraSprint[]> {
+  return request(`/projects/${projectId}/jira/sprints?boardId=${boardId}`);
+}
+
+export function fetchJiraFields(projectId: string): Promise<{ id: string; name: string; custom: boolean }[]> {
+  return request(`/projects/${projectId}/jira/fields`);
+}
+
+export function runJiraSync(projectId: string): Promise<{ imported: number; exported: number; skipped: number; errors: number }> {
+  return request(`/projects/${projectId}/jira/sync`, { method: 'POST' });
+}
+
+export function fetchSyncLogs(projectId: string): Promise<JiraSyncLog[]> {
+  return request(`/projects/${projectId}/jira/sync-log`);
+}
+
+export function linkJiraEntity(projectId: string, body: {
+  entityType: 'release' | 'sprint' | 'task'; entityId: string; jiraId: string; jiraKey?: string; jiraStatus?: string;
+}): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/projects/${projectId}/jira/link`, { method: 'POST', body: JSON.stringify(body) });
+}

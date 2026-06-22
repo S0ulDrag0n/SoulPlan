@@ -6,6 +6,7 @@ import type {
   BoardRow, ReleaseRow, SprintRow, TaskRow, DependencyRow,
   StickyNoteRow, NoteConnectionRow, NoteConnectionTargetType,
   ProjectRow, UserRow, GuestRow, ProjectMemberRow, ProjectInviteRow, SessionRow,
+  JiraConfigRow, JiraSyncLogRow,
   MemberType, MemberRole,
 } from './types';
 
@@ -60,6 +61,7 @@ const MIGRATIONS: { version: number; fn: (db: SqlJsDatabase) => void }[] = [
   { version: 6, fn: migrateV6 },
   { version: 7, fn: migrateV7 },
   { version: 8, fn: migrateV8 },
+  { version: 9, fn: migrateV9 },
 ];
 
 function runMigrations(db: SqlJsDatabase): void {
@@ -309,6 +311,67 @@ function migrateV8(db: SqlJsDatabase): void {
     db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_project_invite_token ON project_invites(token)');
   } catch {
     // Index may already exist
+  }
+}
+
+function migrateV9(db: SqlJsDatabase): void {
+  // Jira integration — per-project config, sync log, and link columns.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS jira_config (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL UNIQUE,
+      base_url TEXT NOT NULL,
+      email TEXT,
+      api_token TEXT,
+      encrypted_token TEXT,
+      jira_type TEXT NOT NULL DEFAULT 'cloud' CHECK (jira_type IN ('cloud', 'server')),
+      board_id TEXT,
+      auto_sync INTEGER NOT NULL DEFAULT 0,
+      last_synced_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS jira_sync_log (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      direction TEXT NOT NULL CHECK (direction IN ('import', 'export')),
+      entity_type TEXT NOT NULL,
+      entity_id TEXT,
+      jira_id TEXT,
+      action TEXT NOT NULL CHECK (action IN ('created', 'updated', 'skipped', 'error')),
+      details TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Add Jira link columns to releases, sprints, and tasks.
+  const releaseCols = getAll(db, 'PRAGMA table_info(releases)');
+  const releaseColNames = releaseCols.map(r => r.name as string);
+  if (!releaseColNames.includes('jira_release_id')) {
+    db.run('ALTER TABLE releases ADD COLUMN jira_release_id TEXT');
+  }
+
+  const sprintCols = getAll(db, 'PRAGMA table_info(sprints)');
+  const sprintColNames = sprintCols.map(r => r.name as string);
+  if (!sprintColNames.includes('jira_sprint_id')) {
+    db.run('ALTER TABLE sprints ADD COLUMN jira_sprint_id TEXT');
+  }
+
+  const taskCols = getAll(db, 'PRAGMA table_info(tasks)');
+  const taskColNames = taskCols.map(r => r.name as string);
+  if (!taskColNames.includes('jira_issue_key')) {
+    db.run('ALTER TABLE tasks ADD COLUMN jira_issue_key TEXT');
+  }
+  if (!taskColNames.includes('jira_issue_id')) {
+    db.run('ALTER TABLE tasks ADD COLUMN jira_issue_id TEXT');
+  }
+  if (!taskColNames.includes('jira_status')) {
+    db.run('ALTER TABLE tasks ADD COLUMN jira_status TEXT');
   }
 }
 
@@ -620,7 +683,7 @@ class SqlJsDataAdapter implements IDatabase {
   }
 
   async updateRelease(id: string, fields: Record<string, unknown>): Promise<void> {
-    const allowedKeys = ['name', 'target_date', 'notes'] as const;
+    const allowedKeys = ['name', 'target_date', 'notes', 'jira_release_id'] as const;
     const sets: string[] = [];
     const values: SqlValue[] = [];
     for (const [key, value] of Object.entries(fields)) {
@@ -674,7 +737,7 @@ class SqlJsDataAdapter implements IDatabase {
   }
 
   async updateSprint(id: string, fields: Record<string, unknown>): Promise<void> {
-    const allowedKeys = ['name', 'capacity', 'capacity_unit', 'start_date', 'end_date', 'notes'] as const;
+    const allowedKeys = ['name', 'capacity', 'capacity_unit', 'start_date', 'end_date', 'notes', 'jira_sprint_id'] as const;
     const sets: string[] = [];
     const values: SqlValue[] = [];
     for (const [key, value] of Object.entries(fields)) {
@@ -709,7 +772,7 @@ class SqlJsDataAdapter implements IDatabase {
   }
 
   async updateTask(id: string, fields: Record<string, unknown>): Promise<void> {
-    const allowedKeys = ['title', 'description', 'estimate', 'color', 'is_critical', 'sprint_id', 'position'] as const;
+    const allowedKeys = ['title', 'description', 'estimate', 'color', 'is_critical', 'sprint_id', 'position', 'jira_issue_key', 'jira_issue_id', 'jira_status'] as const;
     const sets: string[] = [];
     const values: SqlValue[] = [];
     for (const [key, value] of Object.entries(fields)) {
@@ -865,5 +928,70 @@ class SqlJsDataAdapter implements IDatabase {
       [noteId, toType, toId]
     );
     return row as unknown as NoteConnectionRow | undefined;
+  }
+
+  // ─── Jira config ─────────────────────────────────────────
+
+  async getJiraConfig(projectId: string): Promise<JiraConfigRow | undefined> {
+    const row = getOne(this.db, 'SELECT * FROM jira_config WHERE project_id = ?', [projectId]);
+    return row as unknown as JiraConfigRow | undefined;
+  }
+
+  async createJiraConfig(
+    id: string, projectId: string, baseUrl: string, jiraType: string,
+    email: string | null, encryptedToken: string | null, boardId: string | null
+  ): Promise<JiraConfigRow> {
+    this.db.run(
+      'INSERT INTO jira_config (id, project_id, base_url, email, encrypted_token, jira_type, board_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, projectId, baseUrl, email, encryptedToken, jiraType, boardId]
+    );
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM jira_config WHERE id = ?', [id]);
+    return row as unknown as JiraConfigRow;
+  }
+
+  async updateJiraConfig(id: string, fields: Record<string, unknown>): Promise<void> {
+    const allowedKeys = ['base_url', 'email', 'api_token', 'encrypted_token', 'jira_type', 'board_id', 'auto_sync', 'last_synced_at'] as const;
+    const sets: string[] = [];
+    const values: SqlValue[] = [];
+    for (const [key, value] of Object.entries(fields)) {
+      if ((allowedKeys as readonly string[]).includes(key)) {
+        sets.push(`${key} = ?`);
+        values.push(value as SqlValue);
+      }
+    }
+    if (sets.length === 0) return;
+    sets.push("updated_at = datetime('now')");
+    values.push(id);
+    this.db.run(`UPDATE jira_config SET ${sets.join(', ')} WHERE id = ?`, values);
+    saveToDisk(this.db);
+  }
+
+  async deleteJiraConfig(id: string): Promise<void> {
+    this.db.run('DELETE FROM jira_config WHERE id = ?', [id]);
+    saveToDisk(this.db);
+  }
+
+  // ─── Jira sync log ───────────────────────────────────────
+
+  async insertSyncLog(
+    id: string, projectId: string, direction: string, entityType: string,
+    entityId: string | null, jiraId: string | null, action: string, details: string | null
+  ): Promise<JiraSyncLogRow> {
+    this.db.run(
+      'INSERT INTO jira_sync_log (id, project_id, direction, entity_type, entity_id, jira_id, action, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, projectId, direction, entityType, entityId, jiraId, action, details]
+    );
+    saveToDisk(this.db);
+    const row = getOne(this.db, 'SELECT * FROM jira_sync_log WHERE id = ?', [id]);
+    return row as unknown as JiraSyncLogRow;
+  }
+
+  async getSyncLogs(projectId: string, limit: number = 50): Promise<JiraSyncLogRow[]> {
+    return getAll(
+      this.db,
+      'SELECT * FROM jira_sync_log WHERE project_id = ? ORDER BY created_at DESC LIMIT ?',
+      [projectId, limit]
+    ) as unknown as JiraSyncLogRow[];
   }
 }

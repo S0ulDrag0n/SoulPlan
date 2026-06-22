@@ -5,6 +5,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Dependency, Task } from '@/lib/types';
 import { useDependencyConnector } from './DependencyConnector';
+import { JiraBadge } from './JiraBadge';
 
 interface SortableTaskCardProps {
   task: Task;
@@ -15,6 +16,7 @@ interface SortableTaskCardProps {
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
   onJumpToTask?: (taskId: string) => void;
+  onMatch?: (task: Task) => void;
 }
 
 export default function SortableTaskCard({
@@ -24,6 +26,7 @@ export default function SortableTaskCard({
   onEdit,
   onDelete,
   onJumpToTask,
+  onMatch,
 }: SortableTaskCardProps) {
   const {
     attributes,
@@ -106,7 +109,7 @@ export default function SortableTaskCard({
 
       {/* Bottom row: action buttons + connector handle */}
       <div className="flex items-center justify-between mt-2">
-        <div className="flex gap-1">
+        <div className="flex gap-1 items-center">
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(task); }}
             className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400"
@@ -119,6 +122,18 @@ export default function SortableTaskCard({
           >
             Delete
           </button>
+          {onMatch && !task.jiraIssueKey ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onMatch(task); }}
+              className="text-xs text-indigo-400 dark:text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400"
+              title="Link to Jira issue"
+            >
+              Jira
+            </button>
+          ) : null}
+          {task.jiraIssueKey ? (
+            <JiraBadge issueKey={task.jiraIssueKey} status={task.jiraStatus} />
+          ) : null}
         </div>
 
         {/* Dependency connector handle — drag from here to another task to create a dependency */}

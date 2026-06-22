@@ -125,3 +125,30 @@ export interface NoteConnectionRow {
   to_id: string;
   created_at: string;
 }
+
+export interface JiraConfigRow {
+  id: string;
+  project_id: string;
+  base_url: string;
+  email: string | null;
+  api_token: string | null;
+  encrypted_token: string | null;
+  jira_type: string; // 'cloud' | 'server'
+  board_id: string | null;
+  auto_sync: number; // SQLite boolean 0|1
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JiraSyncLogRow {
+  id: string;
+  project_id: string;
+  direction: string; // 'import' | 'export'
+  entity_type: string;
+  entity_id: string | null;
+  jira_id: string | null;
+  action: string; // 'created' | 'updated' | 'skipped' | 'error'
+  details: string | null;
+  created_at: string;
+}

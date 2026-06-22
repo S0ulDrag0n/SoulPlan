@@ -2,12 +2,14 @@ import type {
   BoardRow, ReleaseRow, SprintRow, TaskRow, DependencyRow,
   StickyNoteRow, NoteConnectionRow,
   ProjectRow, UserRow, GuestRow, ProjectMemberRow, ProjectInviteRow, SessionRow,
+  JiraConfigRow, JiraSyncLogRow,
 } from './db/types';
 import type {
   Board, Release, Sprint, Task, Dependency, BoardState,
   StickyNote, NoteConnection,
   SprintWithTasks,
   Project, User, Guest, ProjectMember, ProjectInvite, Session,
+  JiraConfig, JiraSyncLog,
 } from './types';
 
 // ─── Row → Model transforms (pure functions) ────────────────
@@ -82,6 +84,7 @@ export function toSession(row: SessionRow): Session {
 }
 
 export function toRelease(row: ReleaseRow): Release {
+  const r = row as unknown as Record<string, unknown>;
   return {
     id: row.id,
     boardId: row.board_id,
@@ -90,10 +93,12 @@ export function toRelease(row: ReleaseRow): Release {
     targetDate: row.target_date,
     notes: row.notes,
     createdAt: row.created_at,
+    jiraReleaseId: r.jira_release_id as string | null | undefined,
   };
 }
 
 export function toSprint(row: SprintRow): Sprint {
+  const r = row as unknown as Record<string, unknown>;
   return {
     id: row.id,
     releaseId: row.release_id,
@@ -105,10 +110,12 @@ export function toSprint(row: SprintRow): Sprint {
     endDate: row.end_date,
     notes: row.notes,
     createdAt: row.created_at,
+    jiraSprintId: r.jira_sprint_id as string | null | undefined,
   };
 }
 
 export function toTask(row: TaskRow): Task {
+  const r = row as unknown as Record<string, unknown>;
   return {
     id: row.id,
     sprintId: row.sprint_id,
@@ -119,6 +126,9 @@ export function toTask(row: TaskRow): Task {
     isCritical: row.is_critical === 1,
     position: row.position,
     createdAt: row.created_at,
+    jiraIssueKey: r.jira_issue_key as string | null | undefined,
+    jiraIssueId: r.jira_issue_id as string | null | undefined,
+    jiraStatus: r.jira_status as string | null | undefined,
   };
 }
 
@@ -166,6 +176,9 @@ export function taskToRow(task: Partial<Task> & { id: string }): Record<string, 
   if (task.isCritical !== undefined) row.is_critical = task.isCritical ? 1 : 0;
   if (task.sprintId !== undefined) row.sprint_id = task.sprintId;
   if (task.position !== undefined) row.position = task.position;
+  if (task.jiraIssueKey !== undefined) row.jira_issue_key = task.jiraIssueKey;
+  if (task.jiraIssueId !== undefined) row.jira_issue_id = task.jiraIssueId;
+  if (task.jiraStatus !== undefined) row.jira_status = task.jiraStatus;
   return row;
 }
 
@@ -177,6 +190,7 @@ export function sprintToRow(sprint: Partial<Sprint> & { id: string }): Record<st
   if (sprint.startDate !== undefined) row.start_date = sprint.startDate;
   if (sprint.endDate !== undefined) row.end_date = sprint.endDate;
   if (sprint.notes !== undefined) row.notes = sprint.notes;
+  if (sprint.jiraSprintId !== undefined) row.jira_sprint_id = sprint.jiraSprintId;
   return row;
 }
 
@@ -185,6 +199,7 @@ export function releaseToRow(release: Partial<Release> & { id: string }): Record
   if (release.name !== undefined) row.name = release.name;
   if (release.targetDate !== undefined) row.target_date = release.targetDate;
   if (release.notes !== undefined) row.notes = release.notes;
+  if (release.jiraReleaseId !== undefined) row.jira_release_id = release.jiraReleaseId;
   return row;
 }
 
@@ -372,4 +387,35 @@ function patchSprint(state: BoardState, sprintId: string, tasks: Task[]): BoardS
 export function nextPosition(items: { position: number }[]): number {
   if (items.length === 0) return 0;
   return Math.max(...items.map(i => i.position)) + 1;
+}
+
+// ─── Jira transforms (pure functions) ──────────────────────
+
+export function toJiraConfig(row: JiraConfigRow): JiraConfig {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    baseUrl: row.base_url,
+    email: row.email,
+    jiraType: row.jira_type as 'cloud' | 'server',
+    boardId: row.board_id,
+    autoSync: row.auto_sync === 1,
+    lastSyncedAt: row.last_synced_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function toJiraSyncLog(row: JiraSyncLogRow): JiraSyncLog {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    direction: row.direction as 'import' | 'export',
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    jiraId: row.jira_id,
+    action: row.action as 'created' | 'updated' | 'skipped' | 'error',
+    details: row.details,
+    createdAt: row.created_at,
+  };
 }

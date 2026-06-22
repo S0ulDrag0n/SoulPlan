@@ -2,6 +2,7 @@ import type {
   BoardRow, ReleaseRow, SprintRow, TaskRow, DependencyRow,
   StickyNoteRow, NoteConnectionRow, NoteConnectionTargetType,
   ProjectRow, UserRow, GuestRow, ProjectMemberRow, ProjectInviteRow, SessionRow,
+  JiraConfigRow, JiraSyncLogRow,
   MemberType, MemberRole,
 } from './types';
 
@@ -113,4 +114,20 @@ export interface IDatabase {
     toType: NoteConnectionTargetType,
     toId: string
   ): Promise<NoteConnectionRow | undefined>;
+
+  // ─── Jira config ─────────────────────────────────────────
+  getJiraConfig(projectId: string): Promise<JiraConfigRow | undefined>;
+  createJiraConfig(
+    id: string, projectId: string, baseUrl: string, jiraType: string,
+    email: string | null, encryptedToken: string | null, boardId: string | null
+  ): Promise<JiraConfigRow>;
+  updateJiraConfig(id: string, fields: Record<string, unknown>): Promise<void>;
+  deleteJiraConfig(id: string): Promise<void>;
+
+  // ─── Jira sync log ───────────────────────────────────────
+  insertSyncLog(
+    id: string, projectId: string, direction: string, entityType: string,
+    entityId: string | null, jiraId: string | null, action: string, details: string | null
+  ): Promise<JiraSyncLogRow>;
+  getSyncLogs(projectId: string, limit?: number): Promise<JiraSyncLogRow[]>;
 }

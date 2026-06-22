@@ -2,7 +2,7 @@ import type {
   BoardRow, ReleaseRow, SprintRow, TaskRow, DependencyRow,
   StickyNoteRow, NoteConnectionRow, NoteConnectionTargetType,
   ProjectRow, UserRow, GuestRow, ProjectMemberRow, ProjectInviteRow, SessionRow,
-  MemberType, MemberRole,
+  MemberType, MemberRole, ActivityLogRow,
 } from './types';
 
 /**
@@ -113,4 +113,12 @@ export interface IDatabase {
     toType: NoteConnectionTargetType,
     toId: string
   ): Promise<NoteConnectionRow | undefined>;
+
+  // ─── Activity Log ─────────────────────────────────────────
+  insertActivityLog(entry: {
+    id: string; project_id: string; member_id: string | null;
+    action: string; entity_type: string; entity_id: string | null;
+    entity_name: string | null; detail: string | null; created_at: string;
+  }): Promise<void>;
+  getActivityLog(projectId: string, limit: number, offset: number): Promise<ActivityLogRow[]>;
 }

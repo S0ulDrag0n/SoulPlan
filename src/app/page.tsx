@@ -21,6 +21,7 @@ import ShareDialog from '@/components/ShareDialog';
 import BoardTitle from '@/components/BoardTitle';
 import CursorOverlay from '@/components/CursorOverlay';
 import PresenceBar from '@/components/PresenceBar';
+import ActivityLogPanel from '@/components/ActivityLogPanel';
 import { useAuth } from '@/components/AuthProvider';
 import { useBoard } from '@/hooks/useBoard';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
@@ -67,6 +68,7 @@ export default function Home() {
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [userRole, setUserRole] = useState<MemberRole | null>(null);
   const [jumpPan, setJumpPan] = useState<{ x: number; y: number } | null>(null);
+  const [showActivityLog, setShowActivityLog] = useState(false);
 
   // Ref to always-read-latest boardState in async DnD handlers
   const boardStateRef = useRef(boardState);
@@ -510,6 +512,15 @@ export default function Home() {
               <span>🔗</span> Share
             </button>
           ) : null}
+          {session && selectedProjectId ? (
+            <button
+              onClick={() => setShowActivityLog(true)}
+              className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1"
+              title="Activity log"
+            >
+              🔔
+            </button>
+          ) : null}
           {session ? (
             <span className="text-sm text-gray-500 dark:text-gray-400">{session.displayName}</span>
           ) : null}
@@ -670,6 +681,12 @@ export default function Home() {
         <ShareDialog
           projectId={selectedProjectId}
           onClose={() => setShowShareDialog(false)}
+        />
+      ) : null}
+      {showActivityLog && selectedProjectId ? (
+        <ActivityLogPanel
+          projectId={selectedProjectId}
+          onClose={() => setShowActivityLog(false)}
         />
       ) : null}
     </div>

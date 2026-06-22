@@ -10,7 +10,7 @@ import {
   stickyNoteToRow, nextPosition,
 } from './transform';
 import type {
-  BoardState, CreateTaskInput, UpdateTaskInput,
+  BoardState, CreateTaskInput, UpdateTaskInput, ActivityLogEntry,
   CreateReleaseInput, UpdateReleaseInput,
   CreateSprintInput, UpdateSprintInput,
   CreateStickyNoteInput, UpdateStickyNoteInput,
@@ -473,4 +473,49 @@ export async function acceptInvite(
   const session = await createSessionInternal(db, 'guest', guest.id, guest.name);
 
   return { guest, session, project, invite };
+}
+
+// ─── Activity Log ──────────────────────────────────────────
+
+export async function logActivity(
+  projectId: string,
+  memberId: string | null,
+  action: string,
+  entityType: string,
+  entityId?: string,
+  entityName?: string,
+  detail?: string,
+): Promise<void> {
+  const db: IDatabase = await getDb();
+  await db.insertActivityLog({
+    id: randomUUID(),
+    project_id: projectId,
+    member_id: memberId,
+    action,
+    entity_type: entityType,
+    entity_id: entityId ?? null,
+    entity_name: entityName ?? null,
+    detail: detail ?? null,
+    created_at: new Date().toISOString(),
+  });
+}
+
+export async function getActivity(
+  projectId: string,
+  limit = 50,
+  offset = 0,
+): Promise<ActivityLogEntry[]> {
+  const db: IDatabase = await getDb();
+  const rows = await db.getActivityLog(projectId, limit, offset);
+  return rows.map(row => ({
+    id: row.id,
+    projectId: row.project_id,
+    memberId: row.member_id,
+    action: row.action,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    entityName: row.entity_name,
+    detail: row.detail,
+    createdAt: row.created_at,
+  }));
 }

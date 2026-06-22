@@ -647,6 +647,11 @@ class SqlJsDataAdapter implements IDatabase {
     ) as unknown as SprintRow[];
   }
 
+  async getSprint(id: string): Promise<SprintRow | undefined> {
+    const row = getOne(this.db, 'SELECT * FROM sprints WHERE id = ?', [id]);
+    return row as unknown as SprintRow | undefined;
+  }
+
   async createSprint(id: string, releaseId: string, name: string, position: number): Promise<SprintRow> {
     this.db.run('INSERT INTO sprints (id, release_id, name, position) VALUES (?, ?, ?, ?)', [id, releaseId, name, position]);
     saveToDisk(this.db);

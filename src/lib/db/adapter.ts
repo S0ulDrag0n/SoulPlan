@@ -67,6 +67,7 @@ export interface IDatabase {
 
   // ─── Sprints ────────────────────────────────────────────
   getSprintsByReleaseIds(releaseIds: string[]): Promise<SprintRow[]>;
+  getSprint(id: string): Promise<SprintRow | undefined>;
   createSprint(id: string, releaseId: string, name: string, position: number): Promise<SprintRow>;
   updateSprint(id: string, fields: Record<string, unknown>): Promise<void>;
   deleteSprint(id: string): Promise<void>;

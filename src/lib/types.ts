@@ -265,3 +265,14 @@ export interface AddProjectMemberInput {
   memberId: string;
   role?: MemberRole;
 }
+
+/** Burndown chart data for a sprint. */
+export interface BurndownData {
+  totalPoints: number;
+  completedPoints: number;
+  remainingPoints: number;
+  sprint: { id: string; name: string; startDate: string | null; endDate: string | null };
+  idealLine: { day: number; date: string; remaining: number }[];
+  actualLine: { day: number; date: string; remaining: number }[];
+  tasks: { id: string; title: string; estimate: number; isCritical: boolean; createdAt: string }[];
+}

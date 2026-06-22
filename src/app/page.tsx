@@ -21,6 +21,7 @@ import ShareDialog from '@/components/ShareDialog';
 import BoardTitle from '@/components/BoardTitle';
 import CursorOverlay from '@/components/CursorOverlay';
 import PresenceBar from '@/components/PresenceBar';
+import BurndownChart from '@/components/BurndownChart';
 import { useAuth } from '@/components/AuthProvider';
 import { useBoard } from '@/hooks/useBoard';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
@@ -67,6 +68,7 @@ export default function Home() {
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [userRole, setUserRole] = useState<MemberRole | null>(null);
   const [jumpPan, setJumpPan] = useState<{ x: number; y: number } | null>(null);
+  const [burndownSprint, setBurndownSprint] = useState<{ id: string; name: string } | null>(null);
 
   // Ref to always-read-latest boardState in async DnD handlers
   const boardStateRef = useRef(boardState);
@@ -598,6 +600,7 @@ export default function Home() {
                       onDeleteSprint={handleDeleteSprint}
                       dependencies={allDependencies}
                       onJumpToTask={handleJumpToTask}
+                      onShowBurndown={(sprintId, sprintName) => setBurndownSprint({ id: sprintId, name: sprintName })}
                     />
                   ))}
                 </div>
@@ -670,6 +673,13 @@ export default function Home() {
         <ShareDialog
           projectId={selectedProjectId}
           onClose={() => setShowShareDialog(false)}
+        />
+      ) : null}
+      {burndownSprint ? (
+        <BurndownChart
+          sprintId={burndownSprint.id}
+          sprintName={burndownSprint.name}
+          onClose={() => setBurndownSprint(null)}
         />
       ) : null}
     </div>

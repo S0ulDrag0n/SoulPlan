@@ -265,3 +265,16 @@ export interface AddProjectMemberInput {
   memberId: string;
   role?: MemberRole;
 }
+
+/** Activity log entry — audit trail of mutations in a project. */
+export interface ActivityLogEntry {
+  id: string;
+  projectId: string;
+  memberId: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  entityName: string | null;
+  detail: string | null;
+  createdAt: string;
+}

@@ -6,7 +6,7 @@ import type {
   BoardRow, ReleaseRow, SprintRow, TaskRow, DependencyRow,
   StickyNoteRow, NoteConnectionRow, NoteConnectionTargetType,
   ProjectRow, UserRow, GuestRow, ProjectMemberRow, ProjectInviteRow, SessionRow,
-  MemberType, MemberRole,
+  MemberType, MemberRole, ActivityLogRow,
 } from './types';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -60,6 +60,7 @@ const MIGRATIONS: { version: number; fn: (db: SqlJsDatabase) => void }[] = [
   { version: 6, fn: migrateV6 },
   { version: 7, fn: migrateV7 },
   { version: 8, fn: migrateV8 },
+  { version: 9, fn: migrateV9 },
 ];
 
 function runMigrations(db: SqlJsDatabase): void {
@@ -310,6 +311,26 @@ function migrateV8(db: SqlJsDatabase): void {
   } catch {
     // Index may already exist
   }
+}
+
+function migrateV9(db: SqlJsDatabase): void {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      member_id TEXT,
+      action TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT,
+      entity_name TEXT,
+      detail TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+  `);
+  try {
+    db.run('CREATE INDEX IF NOT EXISTS idx_activity_project ON activity_log(project_id, created_at DESC)');
+  } catch { /* index may exist */ }
 }
 
 function saveToDisk(db: SqlJsDatabase): void {
@@ -865,5 +886,28 @@ class SqlJsDataAdapter implements IDatabase {
       [noteId, toType, toId]
     );
     return row as unknown as NoteConnectionRow | undefined;
+  }
+
+  // ─── Activity Log ─────────────────────────────────────────
+
+  async insertActivityLog(entry: {
+    id: string; project_id: string; member_id: string | null;
+    action: string; entity_type: string; entity_id: string | null;
+    entity_name: string | null; detail: string | null; created_at: string;
+  }): Promise<void> {
+    this.db.run(
+      `INSERT INTO activity_log (id, project_id, member_id, action, entity_type, entity_id, entity_name, detail, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [entry.id, entry.project_id, entry.member_id, entry.action, entry.entity_type, entry.entity_id, entry.entity_name, entry.detail, entry.created_at]
+    );
+    saveToDisk(this.db);
+  }
+
+  async getActivityLog(projectId: string, limit: number, offset: number): Promise<ActivityLogRow[]> {
+    return getAll(
+      this.db,
+      `SELECT * FROM activity_log WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      [projectId, limit, offset]
+    ) as unknown as ActivityLogRow[];
   }
 }

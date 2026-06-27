@@ -125,3 +125,15 @@ export interface NoteConnectionRow {
   to_id: string;
   created_at: string;
 }
+
+export interface ActivityLogRow {
+  id: string;
+  project_id: string;
+  member_id: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  entity_name: string | null;
+  detail: string | null;
+  created_at: string;
+}

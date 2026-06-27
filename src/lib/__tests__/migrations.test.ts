@@ -4,7 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 describe('Schema migrations', () => {
-  it('runs all V1-V8 migrations without error and creates expected tables', async () => {
+  it('runs all V1-V9 migrations without error and creates expected tables', async () => {
     const setup = await setupTestDb();
     try {
       const tables = getTables(setup.raw);
@@ -92,7 +92,7 @@ describe('Schema migrations', () => {
       }
       stmt.free();
 
-      expect(versions).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(versions).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
       // Re-run getDb() on the same file — migrations should be a no-op.
       // We simulate this by re-importing with the same data dir.

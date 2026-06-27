@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { ActivityLogEntry } from '@/lib/types';
+import { authHeaders } from '@/lib/api';
 
 interface ActivityLogPanelProps {
   projectId: string;
@@ -38,7 +39,9 @@ export default function ActivityLogPanel({ projectId, onClose }: ActivityLogPane
     setLoading(true);
     const newOffset = reset ? 0 : offset;
     try {
-      const res = await fetch(`/api/projects/${projectId}/activity?limit=50&offset=${newOffset}`);
+      const res = await fetch(`/api/projects/${projectId}/activity?limit=50&offset=${newOffset}`, {
+        headers: { ...authHeaders() },
+      });
       const data = await res.json();
       const newEntries: ActivityLogEntry[] = data.entries ?? [];
       if (reset) {

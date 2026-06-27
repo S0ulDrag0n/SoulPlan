@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as q from '@/lib/queries';
 import { broadcastBoardUpdate } from '@/lib/realtime/broadcast';
-import { requireAuth, getMemberRole } from '@/lib/auth';
-import type { UpdateTaskInput } from '@/lib/types';
+import { authenticate, getMemberRole, AuthError } from '@/lib/auth';
+import type { UpdateTaskInput, TaskPriority } from '@/lib/types';
+
+const VALID_PRIORITIES: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
+
 // GET /api/tasks/[id] — return single task with detail
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireAuth(req);
+    const session = await authenticate(req);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await params;
@@ -28,13 +31,21 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireAuth(req);
+    const session = await authenticate(req);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await params;
     const body = await req.json() as UpdateTaskInput & { projectId?: string };
     const projectId = body.projectId;
     if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 });
+
+    // Validate priority if provided
+    if (body.priority !== undefined && !VALID_PRIORITIES.includes(body.priority)) {
+      return NextResponse.json(
+        { error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}` },
+        { status: 400 }
+      );
+    }
 
     // Only owner/editor can update tasks
     const role = await getMemberRole(projectId, session.memberId);
@@ -48,6 +59,9 @@ export async function PATCH(
     const updated = await q.getTaskDetail(id);
     return NextResponse.json(updated);
   } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.statusCode });
+    }
     console.error('PATCH /api/tasks/[id] error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

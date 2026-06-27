@@ -4,7 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 describe('Schema migrations', () => {
-  it('runs all V1-V9 migrations without error and creates expected tables', async () => {
+  it('runs all V1-V10 migrations without error and creates expected tables', async () => {
     const setup = await setupTestDb();
     try {
       const tables = getTables(setup.raw);
@@ -14,6 +14,7 @@ describe('Schema migrations', () => {
         'project_members', 'project_invites',
         'releases', 'sprints', 'tasks', 'dependencies',
         'sticky_notes', 'note_connections',
+        'activity_log',
         'schema_migrations',
       ];
 
@@ -84,7 +85,7 @@ describe('Schema migrations', () => {
   it('is idempotent — running getDb() twice does not re-run migrations', async () => {
     const setup = await setupTestDb();
     try {
-      // Check that schema_migrations has all 8 versions recorded
+      // Check that schema_migrations has all 10 versions recorded
       const stmt = setup.raw.prepare('SELECT version FROM schema_migrations ORDER BY version');
       const versions: number[] = [];
       while (stmt.step()) {
@@ -92,7 +93,7 @@ describe('Schema migrations', () => {
       }
       stmt.free();
 
-      expect(versions).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      expect(versions).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
       // Re-run getDb() on the same file — migrations should be a no-op.
       // We simulate this by re-importing with the same data dir.
@@ -101,6 +102,18 @@ describe('Schema migrations', () => {
       // If migrations re-ran, they would fail with "column already exists" errors.
       // The fact that this doesn't throw proves idempotency.
       expect(adapter2).toBeDefined();
+    } finally {
+      setup.cleanup();
+    }
+  });
+
+  it('creates tasks.assignee_id, priority, and updated_at columns (V10)', async () => {
+    const setup = await setupTestDb();
+    try {
+      const cols = getColumns(setup.raw, 'tasks');
+      expect(cols).toContain('assignee_id');
+      expect(cols).toContain('priority');
+      expect(cols).toContain('updated_at');
     } finally {
       setup.cleanup();
     }

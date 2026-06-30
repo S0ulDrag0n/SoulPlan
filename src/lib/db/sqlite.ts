@@ -779,6 +779,25 @@ class SqlJsDataAdapter implements IDatabase {
     return (row?.pos as number) ?? 0;
   }
 
+  async searchTasksByProjectId(projectId: string, query: string): Promise<(TaskRow & { sprint_name: string; release_name: string })[]> {
+    // Case-insensitive LIKE search on task titles, scoped to a project via
+    // the boards→releases→sprints→tasks FK chain. Returns task rows enriched
+    // with their containing sprint and release names for UI context.
+    const like = `%${query.replace(/[%_]/g, (m) => '\\' + m)}%`;
+    return getAll(
+      this.db,
+      `SELECT t.*, s.name AS sprint_name, r.name AS release_name
+         FROM tasks t
+         INNER JOIN sprints s ON s.id = t.sprint_id
+         INNER JOIN releases r ON r.id = s.release_id
+         INNER JOIN boards b ON b.id = r.board_id
+         WHERE b.project_id = ? AND t.title LIKE ? ESCAPE '\\'
+         ORDER BY t.created_at DESC
+         LIMIT 50`,
+      [projectId, like],
+    ) as unknown as (TaskRow & { sprint_name: string; release_name: string })[];
+  }
+
   // ─── Dependencies ──────────────────────────────────────
 
   async getDependenciesByTaskIds(taskIds: string[]): Promise<DependencyRow[]> {

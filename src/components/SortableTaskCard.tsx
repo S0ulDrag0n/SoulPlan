@@ -14,6 +14,7 @@ interface SortableTaskCardProps {
   onDelete: (id: string) => void;
   onJumpToTask?: (taskId: string) => void;
   onSelect?: (task: Task) => void;
+  dimmed?: boolean;
 }
 
 export default function SortableTaskCard({
@@ -24,6 +25,7 @@ export default function SortableTaskCard({
   onDelete,
   onJumpToTask,
   onSelect,
+  dimmed = false,
 }: SortableTaskCardProps) {
   const {
     attributes,
@@ -42,7 +44,7 @@ export default function SortableTaskCard({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition: isDragging ? 'none' : transition,
-    opacity: isDragging ? 0 : 1,
+    opacity: isDragging ? 0 : dimmed ? 0.3 : 1,
     borderLeft: `4px solid ${task.color}`,
   };
 

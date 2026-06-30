@@ -23,12 +23,15 @@ import CursorOverlay from '@/components/CursorOverlay';
 import PresenceBar from '@/components/PresenceBar';
 import ActivityLogPanel from '@/components/ActivityLogPanel';
 import TaskDetailPanel from '@/components/TaskDetailPanel';
+import SearchBar from '@/components/SearchBar';
+import FilterBar from '@/components/FilterBar';
+import { applyTaskFilter } from '@/lib/filter';
 import { useAuth } from '@/components/AuthProvider';
 import { useBoard } from '@/hooks/useBoard';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
 import { useRealtime } from '@/hooks/useRealtime';
 import { findTaskById, resolveDropTarget } from '@/lib/transform';
-import type { Task, Release, Sprint, StickyNote as StickyNoteModel, NoteConnectionTargetType, Project, MemberRole, ProjectMember } from '@/lib/types';
+import type { Task, Release, Sprint, StickyNote as StickyNoteModel, NoteConnectionTargetType, Project, MemberRole, ProjectMember, TaskFilter } from '@/lib/types';
 import * as api from '@/lib/api';
 
 const STICKY_COLORS = ['yellow', 'pink', 'blue', 'green', 'purple'] as const;
@@ -72,6 +75,7 @@ export default function Home() {
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
+  const [taskFilter, setTaskFilter] = useState<TaskFilter | null>(null);
 
   // Ref to always-read-latest boardState in async DnD handlers
   const boardStateRef = useRef(boardState);
@@ -94,6 +98,15 @@ export default function Home() {
 
   // Fetch the current user's role in the selected project.
   const isOwner = userRole === 'owner';
+
+  // Compute set of task IDs that match the current filter (null = no filter, all visible)
+  const allSprints = boardState?.releases.flatMap(r => r.sprints) ?? [];
+  const filteredTaskIds = taskFilter ? applyTaskFilter(boardState, taskFilter) : null;
+  const dimmedTaskIds = filteredTaskIds !== null ? new Set(
+    (boardState?.releases.flatMap(r => r.sprints.flatMap(s => s.tasks)) ?? [])
+      .filter(t => !filteredTaskIds.has(t.id))
+      .map(t => t.id)
+  ) : null;
   useEffect(() => {
     if (session && selectedProjectId) {
       api.fetchProjectMembers(selectedProjectId)
@@ -502,6 +515,12 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <ProjectSwitcher currentProjectId={selectedProjectId} onSelectProject={handleSelectProject} />
           <BoardTitle boardState={boardState} isOwner={isOwner} onRename={handleRenameBoard} />
+          {session && selectedProjectId ? (
+            <SearchBar projectId={selectedProjectId} onJumpToTask={handleJumpToTask} />
+          ) : null}
+          {session && selectedProjectId && boardState && boardState.releases.length > 0 ? (
+            <FilterBar filter={taskFilter} onChange={setTaskFilter} sprints={allSprints.map(s => ({ id: s.id, name: s.name }))} />
+          ) : null}
         </div>
         <div className="flex items-center gap-3">
           {saving ? <span className="text-sm text-gray-400 dark:text-gray-500">Saving...</span> : null}
@@ -615,6 +634,7 @@ export default function Home() {
                       dependencies={allDependencies}
                       onJumpToTask={handleJumpToTask}
                       onSelectTask={setSelectedTask}
+                      dimmedTaskIds={dimmedTaskIds}
                     />
                   ))}
                 </div>

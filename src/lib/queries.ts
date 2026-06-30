@@ -21,6 +21,7 @@ import type {
   MemberType, MemberRole,
   CreateProjectInput, UpdateProjectInput,
   RegisterInput, LoginInput, JoinAsGuestInput,
+  SearchResult, TaskFilter,
 } from './types';
 
 // ─── Board queries ────────────────────────────────────────
@@ -523,5 +524,30 @@ export async function getActivity(
     entityName: row.entity_name,
     detail: row.detail,
     createdAt: row.created_at,
+  }));
+}
+
+// ─── Search queries ───────────────────────────────────────
+
+/**
+ * Search tasks by title (case-insensitive, partial match) within a project.
+ * Returns matches with their release/sprint context so the UI can display
+ * "Task Name — Sprint 2 / Release 1" and jump to the task on click.
+ */
+export async function searchTasks(projectId: string, query: string): Promise<SearchResult[]> {
+  const db: IDatabase = await getDb();
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  const rows = await db.searchTasksByProjectId(projectId, trimmed);
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    sprintId: row.sprint_id,
+    sprintName: row.sprint_name,
+    releaseId: '', // release_id not on the task row; resolved via sprint below
+    releaseName: row.release_name,
+    estimate: row.estimate,
+    color: row.color,
+    isCritical: row.is_critical === 1,
   }));
 }

@@ -17,12 +17,13 @@ interface ReleaseBlockProps {
   onJumpToTask?: (taskId: string) => void;
   onSelectTask?: (task: import('@/lib/types').Task) => void;
   dimmedTaskIds?: Set<string> | null;
+  editingByTask?: Map<string, string> | null;
 }
 
 export default function ReleaseBlock({
   release, onAddSprint, onEditRelease, onDeleteRelease,
   onAddTask, onEditTask, onDeleteTask,
-  onEditSprint, onDeleteSprint, dependencies, onJumpToTask, onSelectTask, dimmedTaskIds,
+  onEditSprint, onDeleteSprint, dependencies, onJumpToTask, onSelectTask, dimmedTaskIds, editingByTask,
 }: ReleaseBlockProps) {
   const targetDate = release.targetDate
     ? new Date(release.targetDate).toLocaleDateString()
@@ -72,6 +73,7 @@ export default function ReleaseBlock({
             onJumpToTask={onJumpToTask}
             onSelectTask={onSelectTask}
             dimmedTaskIds={dimmedTaskIds}
+            editingByTask={editingByTask}
           />
         ))}
 

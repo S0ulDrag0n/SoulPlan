@@ -15,6 +15,7 @@ interface SortableTaskCardProps {
   onJumpToTask?: (taskId: string) => void;
   onSelect?: (task: Task) => void;
   dimmed?: boolean;
+  editingBy?: string | null;
 }
 
 export default function SortableTaskCard({
@@ -26,6 +27,7 @@ export default function SortableTaskCard({
   onJumpToTask,
   onSelect,
   dimmed = false,
+  editingBy = null,
 }: SortableTaskCardProps) {
   const {
     attributes,
@@ -79,6 +81,11 @@ export default function SortableTaskCard({
       </div>
       {task.isCritical ? (
         <span className="text-xs text-red-600 dark:text-red-400 font-semibold mt-1 inline-block">⚡ Critical</span>
+      ) : null}
+      {editingBy ? (
+        <span className="text-xs text-blue-500 dark:text-blue-400 mt-1 inline-block animate-pulse" title={`${editingBy} is editing this task`}>
+          ✏️ {editingBy} editing…
+        </span>
       ) : null}
 
       {/* Dependency badges */}

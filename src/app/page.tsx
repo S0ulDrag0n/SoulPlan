@@ -62,7 +62,7 @@ export default function Home() {
   // default board still works. Auth is required only for creating projects.
   const { boardState, setBoardState, loading, error, reload } = useBoard(selectedProjectId ?? undefined);
   const { saving, error: mutationError, moveTask, createTask, saveTask, deleteTask, reorderTasks } = useTaskMutations(boardState, reload, setBoardState, selectedProjectId);
-  const { cursors, presence, sendCursor } = useRealtime(selectedProjectId, session, {
+  const { cursors, presence, sendCursor, editing } = useRealtime(selectedProjectId, session, {
     onBoardUpdate: () => debouncedReload(),
   });
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -107,6 +107,17 @@ export default function Home() {
       .filter(t => !filteredTaskIds.has(t.id))
       .map(t => t.id)
   ) : null;
+
+  // Build a taskId → editor name map from the realtime editing indicators.
+  // Filters out the current user's own editing state (only show others).
+  const editingByTask = new Map<string, string>();
+  if (editing.size > 0 && session) {
+    for (const [, ind] of editing) {
+      if (ind.target === 'task' && ind.memberId !== session.memberId) {
+        editingByTask.set(ind.targetId, ind.memberName);
+      }
+    }
+  }
   useEffect(() => {
     if (session && selectedProjectId) {
       api.fetchProjectMembers(selectedProjectId)
@@ -211,13 +222,14 @@ export default function Home() {
     reload();
   }, [reload, selectedProjectId]);
 
-  // ─── Jump to task (for dependency badges) ────────────────
+  // ─── Jump to task (for search results + dependency badges) ───
+  // Opens the task detail panel (same as clicking a card).
 
   const handleJumpToTask = useCallback((taskId: string) => {
     const state = boardStateRef.current;
     if (!state) return;
     const task = findTaskById(state, taskId);
-    if (task) setEditingTask(task);
+    if (task) setSelectedTask(task);
   }, []);
 
   // ─── CRUD handlers ────────────────────────────────────────
@@ -635,6 +647,7 @@ export default function Home() {
                       onJumpToTask={handleJumpToTask}
                       onSelectTask={setSelectedTask}
                       dimmedTaskIds={dimmedTaskIds}
+                      editingByTask={editingByTask}
                     />
                   ))}
                 </div>

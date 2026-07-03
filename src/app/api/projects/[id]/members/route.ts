@@ -54,6 +54,7 @@ export async function POST(
     }
 
     const member = await q.addProjectMember(projectId, memberType, memberId, role ?? 'editor');
+    q.logActivity(projectId, session.memberId, 'added', 'member', memberId, `${memberType}/${memberId}`).catch(() => {});
     return NextResponse.json(member);
   } catch (error) {
     if (error instanceof AuthError) {

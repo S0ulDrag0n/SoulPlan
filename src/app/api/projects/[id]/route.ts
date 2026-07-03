@@ -58,6 +58,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'isArchived must be a boolean' }, { status: 400 });
     }
     await q.updateProject({ id, ...body });
+    q.logActivity(id, session.memberId, 'updated', 'project', id, body.name).catch(() => {});
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof AuthError) {
@@ -86,6 +87,7 @@ export async function DELETE(
     }
 
     await q.deleteProject(id);
+    q.logActivity(id, session.memberId, 'deleted', 'project', id).catch(() => {});
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof AuthError) {

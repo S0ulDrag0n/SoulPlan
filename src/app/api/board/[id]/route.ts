@@ -27,6 +27,7 @@ export async function PATCH(
     }
 
     await q.updateBoardName(boardId, name.trim());
+    q.logActivity(projectId, session.memberId, 'renamed', 'board', boardId, name.trim()).catch(() => {});
     broadcastBoardUpdate(projectId, 'board-renamed');
     return NextResponse.json({ ok: true });
   } catch (error) {

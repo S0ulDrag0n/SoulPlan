@@ -19,6 +19,10 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await q.acceptInvite(token, name.trim());
+    // Log the guest join (use the new session's member ID)
+    if (result.project?.id && result.session?.memberId) {
+      q.logActivity(result.project.id, result.session.memberId, 'joined', 'project', result.project.id, result.project.name).catch(() => {});
+    }
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to accept invite';

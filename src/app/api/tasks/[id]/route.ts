@@ -55,6 +55,7 @@ export async function PATCH(
 
     const { id: _id, projectId: _pid, ...fields } = body;
     await q.updateTask({ id, ...fields } as UpdateTaskInput);
+    q.logActivity(projectId, session.memberId, 'updated', 'task', id, fields.title).catch(() => {});
     await broadcastBoardUpdate(projectId, 'task-updated');
     const updated = await q.getTaskDetail(id);
     return NextResponse.json(updated);

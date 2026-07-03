@@ -22,6 +22,7 @@ export async function PATCH(
     }
 
     await q.updateSprint({ id, ...body });
+    q.logActivity(projectId, session.memberId, 'updated', 'sprint', id, body.name).catch(() => {});
     broadcastBoardUpdate(projectId, 'sprint-updated');
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -52,6 +53,7 @@ export async function DELETE(
     }
 
     await q.deleteSprint(id);
+    q.logActivity(projectId, session.memberId, 'deleted', 'sprint', id).catch(() => {});
     broadcastBoardUpdate(projectId, 'sprint-deleted');
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -22,6 +22,7 @@ export async function PATCH(
     }
 
     await q.updateStickyNote({ id, ...body });
+    q.logActivity(projectId, session.memberId, 'updated', 'note', id, body.text?.slice(0, 50)).catch(() => {});
     broadcastBoardUpdate(projectId, 'sticky-note-updated');
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -52,6 +53,7 @@ export async function DELETE(
     }
 
     await q.deleteStickyNote(id);
+    q.logActivity(projectId, session.memberId, 'deleted', 'note', id).catch(() => {});
     broadcastBoardUpdate(projectId, 'sticky-note-deleted');
     return NextResponse.json({ success: true });
   } catch (error) {

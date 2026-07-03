@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     const conn = await q.createNoteConnection({ noteId, toType, toId });
+    q.logActivity(projectId, session.memberId, 'created', 'note-connection', conn.id, `${noteId}→${toType}:${toId}`).catch(() => {});
     broadcastBoardUpdate(projectId, 'note-connection-created');
     return NextResponse.json(conn);
   } catch (error) {
@@ -69,6 +70,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     await q.deleteNoteConnection(id);
+    q.logActivity(projectId, session.memberId, 'deleted', 'note-connection', id).catch(() => {});
     broadcastBoardUpdate(projectId, 'note-connection-deleted');
     return NextResponse.json({ success: true });
   } catch (error) {

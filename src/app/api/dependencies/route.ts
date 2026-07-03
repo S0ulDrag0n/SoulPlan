@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Dependency already exists' }, { status: 409 });
     }
     const dep = await q.createDependency(fromTaskId, toTaskId);
+    q.logActivity(projectId, session.memberId, 'created', 'dependency', dep.id, `${fromTaskId}→${toTaskId}`).catch(() => {});
     broadcastBoardUpdate(projectId, 'dependency-created');
     return NextResponse.json(dep);
   } catch (error) {
@@ -65,6 +66,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     await q.deleteDependency(id);
+    q.logActivity(projectId, session.memberId, 'deleted', 'dependency', id).catch(() => {});
     broadcastBoardUpdate(projectId, 'dependency-deleted');
     return NextResponse.json({ success: true });
   } catch (error) {

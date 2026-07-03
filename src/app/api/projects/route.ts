@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'name required' }, { status: 400 });
     }
     const project = await q.createProject({ name }, session.memberId);
+    q.logActivity(project.id, session.memberId, 'created', 'project', project.id, project.name).catch(() => {});
     return NextResponse.json(project);
   } catch (error) {
     if (error instanceof AuthError) {

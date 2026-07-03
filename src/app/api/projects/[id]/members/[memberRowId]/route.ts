@@ -23,6 +23,7 @@ export async function DELETE(
     }
 
     await q.removeProjectMember(memberRowId);
+    q.logActivity(projectId, session.memberId, 'removed', 'member', memberRowId).catch(() => {});
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof AuthError) {

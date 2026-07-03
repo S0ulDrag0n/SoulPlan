@@ -48,6 +48,7 @@ export async function POST(
     const inviteRole = body.role === 'viewer' ? 'viewer' : 'editor';
 
     const invite = await q.createInvite(projectId, inviteRole);
+    q.logActivity(projectId, session.memberId, 'created', 'invite', invite.id, invite.role).catch(() => {});
     return NextResponse.json(invite);
   } catch (error) {
     if (error instanceof AuthError) {
@@ -80,6 +81,7 @@ export async function DELETE(
     }
 
     await q.deleteInvite(inviteId);
+    q.logActivity(projectId, session.memberId, 'revoked', 'invite', inviteId).catch(() => {});
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof AuthError) {

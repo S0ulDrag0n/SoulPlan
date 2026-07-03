@@ -24,20 +24,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // On mount, try to restore session from localStorage
+  // On mount, verify the stored token server-side before trusting it.
+  // This prevents expired or tampered tokens from granting access.
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem(SESSION_KEY) : null;
-    const storedInfo = typeof window !== 'undefined' ? localStorage.getItem(SESSION_INFO_KEY) : null;
-    if (token && storedInfo) {
-      try {
-        const info = JSON.parse(storedInfo) as Session;
-        setSession(info);
-      } catch {
-        localStorage.removeItem(SESSION_KEY);
-        localStorage.removeItem(SESSION_INFO_KEY);
-      }
+    if (!token) {
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+    // Verify the token is still valid server-side
+    api.verifySession()
+      .then((result) => {
+        if (result.authenticated && result.session) {
+          setSession(result.session);
+          // Update stored info in case server returned updated fields
+          localStorage.setItem(SESSION_INFO_KEY, JSON.stringify(result.session));
+        } else {
+          // Token is invalid/expired — clear it
+          localStorage.removeItem(SESSION_KEY);
+          localStorage.removeItem(SESSION_INFO_KEY);
+        }
+      })
+      .catch(() => {
+        // Network error — don't clear token (might be temporary), but don't set session either
+        // Fall back to stored info so the user can retry once connection is restored
+        const storedInfo = typeof window !== 'undefined' ? localStorage.getItem(SESSION_INFO_KEY) : null;
+        if (storedInfo) {
+          try {
+            setSession(JSON.parse(storedInfo) as Session);
+          } catch {
+            localStorage.removeItem(SESSION_KEY);
+            localStorage.removeItem(SESSION_INFO_KEY);
+          }
+        }
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {

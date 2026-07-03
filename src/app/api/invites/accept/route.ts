@@ -4,6 +4,8 @@ import * as q from '@/lib/queries';
 // POST /api/invites/accept — accept a project invite
 // Body: { token: string, name: string }
 // Returns: { guest, session, project, invite }
+// No auth required — the invite token itself serves as authorization.
+// This endpoint creates a new guest account and session.
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();

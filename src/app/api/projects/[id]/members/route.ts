@@ -1,17 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as q from '@/lib/queries';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { requireAuth, getMemberRole, AuthError } from '@/lib/auth';
 
 // GET /api/projects/[id]/members — list members of a project
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await requireAuth(req);
     const { id } = await params;
+
+    // Must be a member to view the member list
+    const role = await getMemberRole(id, session.memberId);
+    if (role === null) {
+      return NextResponse.json({ error: 'Not a member of this project' }, { status: 403 });
+    }
+
     const members = await q.getProjectMembers(id);
     return NextResponse.json(members);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('GET /api/projects/[id]/members error:', error);
     return NextResponse.json({ error: 'Failed to list members' }, { status: 500 });
   }

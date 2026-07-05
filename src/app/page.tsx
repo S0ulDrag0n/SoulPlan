@@ -62,7 +62,7 @@ export default function Home() {
   // default board still works. Auth is required only for creating projects.
   const { boardState, setBoardState, loading, error, reload } = useBoard(selectedProjectId ?? undefined);
   const { saving, error: mutationError, moveTask, createTask, saveTask, deleteTask, reorderTasks } = useTaskMutations(boardState, reload, setBoardState, selectedProjectId);
-  const { cursors, presence, sendCursor, editing } = useRealtime(selectedProjectId, session, {
+  const { cursors, presence, sendCursor, editing, sendEditing } = useRealtime(selectedProjectId, session, {
     onBoardUpdate: () => debouncedReload(),
   });
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -738,6 +738,11 @@ export default function Home() {
           onUpdated={(updated) => {
             setSelectedTask(updated);
             reload();
+          }}
+          onEditingChange={(isEditing) => {
+            if (sendEditing && selectedTask) {
+              sendEditing('task', selectedTask.id);
+            }
           }}
         />
       ) : null}

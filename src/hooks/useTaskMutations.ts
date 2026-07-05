@@ -150,6 +150,8 @@ export function useTaskMutations(
       estimate: task.estimate,
       color: task.color,
       isCritical: task.isCritical,
+      assigneeId: task.assigneeId,
+      priority: task.priority,
     };
     try {
       setSaving(true);

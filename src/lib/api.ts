@@ -7,7 +7,7 @@ import type {
   Task, Dependency, StickyNote, NoteConnection,
   Project, Session, ProjectMember, ProjectInvite,
   CreateProjectInput, RegisterInput, LoginInput, JoinAsGuestInput,
-  MemberType, MemberRole,
+  MemberRole,
   SearchResult,
 } from '@/lib/types';
 
@@ -118,10 +118,6 @@ export function deleteTask(id: string, projectId?: string): Promise<{ success: b
   });
 }
 
-export function fetchTaskDetail(id: string): Promise<Task> {
-  return request<Task>(`/tasks/${id}`);
-}
-
 export function updateTaskDetail(id: string, fields: Partial<UpdateTaskInput> & { projectId: string }): Promise<Task> {
   return request<Task>(`/tasks/${id}`, {
     method: 'PATCH',
@@ -197,20 +193,9 @@ export function fetchProjects(): Promise<Project[]> {
   return request<Project[]>('/projects');
 }
 
-export function fetchProject(id: string): Promise<Project> {
-  return request<Project>(`/projects/${id}`);
-}
-
 export function createProject(input: CreateProjectInput): Promise<Project> {
   return request<Project>('/projects', {
     method: 'POST',
-    body: JSON.stringify(input),
-  });
-}
-
-export function updateProject(id: string, input: { name?: string; isArchived?: boolean }): Promise<{ success: boolean }> {
-  return request<{ success: boolean }>(`/projects/${id}`, {
-    method: 'PATCH',
     body: JSON.stringify(input),
   });
 }
@@ -243,18 +228,6 @@ export function deleteProject(id: string): Promise<{ success: boolean }> {
 
 export function fetchProjectMembers(projectId: string): Promise<ProjectMember[]> {
   return request<ProjectMember[]>(`/projects/${projectId}/members`);
-}
-
-export function addProjectMember(
-  projectId: string,
-  memberType: MemberType,
-  memberId: string,
-  role?: MemberRole
-): Promise<ProjectMember> {
-  return request<ProjectMember>(`/projects/${projectId}/members`, {
-    method: 'POST',
-    body: JSON.stringify({ memberType, memberId, role }),
-  });
 }
 
 export function removeProjectMember(projectId: string, memberRowId: string): Promise<{ success: boolean }> {

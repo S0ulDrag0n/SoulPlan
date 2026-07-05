@@ -11,6 +11,7 @@ interface TaskDetailPanelProps {
   canEdit: boolean;
   onClose: () => void;
   onUpdated: (task: Task) => void;
+  onEditingChange?: (isEditing: boolean) => void;
 }
 
 const PRIORITIES: { value: TaskPriority; label: string; color: string }[] = [
@@ -21,7 +22,7 @@ const PRIORITIES: { value: TaskPriority; label: string; color: string }[] = [
 ];
 
 export default function TaskDetailPanel({
-  task, projectId, members, canEdit, onClose, onUpdated,
+  task, projectId, members, canEdit, onClose, onUpdated, onEditingChange,
 }: TaskDetailPanelProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState('');
@@ -41,6 +42,11 @@ export default function TaskDetailPanel({
       setEditing(false);
     }
   }, [task?.id]);
+
+  // Notify parent when editing state changes (for realtime editing indicators)
+  useEffect(() => {
+    onEditingChange?.(editing);
+  }, [editing, onEditingChange]);
 
   // ESC to close
   useEffect(() => {

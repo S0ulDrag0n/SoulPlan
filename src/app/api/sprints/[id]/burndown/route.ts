@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db/sqlite';
-import { requireAuth, getMemberRole } from '@/lib/auth';
+import { authenticate, getMemberRole, AuthError } from '@/lib/auth';
 import { toSprint, toTask } from '@/lib/transform';
 
 interface BurndownData {
@@ -18,7 +18,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireAuth(req);
+    const session = await authenticate(req);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await params;
@@ -93,6 +93,9 @@ export async function GET(
 
     return NextResponse.json(data);
   } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.statusCode });
+    }
     console.error('GET /api/sprints/[id]/burndown error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

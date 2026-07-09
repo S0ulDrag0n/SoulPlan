@@ -19,8 +19,16 @@ export default function BurndownChart({ sprintId, sprintName, onClose }: Burndow
     let cancelled = false;
     setLoading(true);
     fetch(`/api/sprints/${sprintId}/burndown`, { headers: { ...authHeaders() } })
-      .then(res => res.json())
-      .then(d => { if (!cancelled) { setData(d); setError(null); } })
+      .then(res => res.json().then(d => ({ ok: res.ok, d })))
+      .then(({ ok, d }) => {
+        if (cancelled) return;
+        if (ok && d.totalPoints !== undefined) {
+          setData(d);
+          setError(null);
+        } else {
+          setError(d.error || 'Failed to load burndown data');
+        }
+      })
       .catch(err => { if (!cancelled) setError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };

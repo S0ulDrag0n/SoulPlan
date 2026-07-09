@@ -43,6 +43,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Token is invalid/expired — clear it
           localStorage.removeItem(SESSION_KEY);
           localStorage.removeItem(SESSION_INFO_KEY);
+          // Clear last-used project too — a different user's next login
+          // would otherwise 403 the board fetch on a project they don't own.
+          localStorage.removeItem('soulplan-selected-project');
         }
       })
       .catch(() => {
@@ -90,6 +93,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(SESSION_INFO_KEY);
+    // Clear last-used project so a different user's next login doesn't
+    // restore a project they aren't a member of (would 403 the board fetch).
+    localStorage.removeItem('soulplan-selected-project');
     setSession(null);
   }, []);
 

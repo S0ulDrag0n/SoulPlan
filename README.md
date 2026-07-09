@@ -47,6 +47,16 @@ npx jest
 
 Tests live in `src/lib/__tests__/` and cover the transform functions, auth logic, realtime EventBus, schema migrations, and query functions.
 
+## Clearing the Build Cache
+
+`next build` / `next dev` regenerate caches automatically — you don't normally need to clear them. If you hit confusing errors pointing at files or routes that no longer exist in the source (stale generated types, phantom `.next/` references), clear the cache:
+
+```bash
+npm run clean
+```
+
+Then rebuild or restart. This removes the `.next/` directory so the next build regenerates it from scratch.
+
 ## Docker
 
 Pre-built images are published to GHCR on every push to `master` and on `v0.1*` tags. Images are `linux/amd64` only — Tailwind CSS and Lightning CSS have cross-platform optional deps that don't build on arm64.

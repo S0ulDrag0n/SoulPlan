@@ -133,6 +133,17 @@ export default function Home() {
     }
   }, [session, selectedProjectId]);
 
+  // Belt-and-suspenders: if the board fetch fails because the user isn't a
+  // member of the selected project (e.g. a stale localStorage project ID
+  // from a previous user), clear it so the project picker renders instead
+  // of the raw error screen.
+  useEffect(() => {
+    if (error && /not a member/i.test(error) && selectedProjectId) {
+      localStorage.removeItem('soulplan-selected-project');
+      setSelectedProjectId(null);
+    }
+  }, [error, selectedProjectId]);
+
   const handleRenameBoard = useCallback(async (name: string) => {
     if (!boardState || !selectedProjectId) return;
     await api.updateBoardName(boardState.board.id, name, selectedProjectId);

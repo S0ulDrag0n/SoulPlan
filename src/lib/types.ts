@@ -87,6 +87,7 @@ export interface Sprint {
 }
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type TaskStatus = 'todo' | 'in-progress' | 'done';
 
 export interface Task {
   id: string;
@@ -101,6 +102,8 @@ export interface Task {
   assigneeId: string | null;
   priority: TaskPriority;
   updatedAt: string | null;
+  status: TaskStatus;
+  completedAt: string | null;
 }
 
 export interface Dependency {
@@ -177,6 +180,8 @@ export interface UpdateTaskInput {
   position?: number;
   assigneeId?: string | null;
   priority?: TaskPriority;
+  status?: TaskStatus;
+  completedAt?: string | null;
 }
 
 /** Input shape for creating a release */
@@ -322,5 +327,5 @@ export interface BurndownData {
   sprint: { id: string; name: string; startDate: string | null; endDate: string | null };
   idealLine: { day: number; date: string; remaining: number }[];
   actualLine: { day: number; date: string; remaining: number }[];
-  tasks: { id: string; title: string; estimate: number; isCritical: boolean; createdAt: string }[];
+  tasks: { id: string; title: string; estimate: number; status: string; isCritical: boolean; createdAt: string; completedAt: string | null }[];
 }

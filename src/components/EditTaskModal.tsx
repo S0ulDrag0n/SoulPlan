@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { BoardState, Dependency, Task } from '@/lib/types';
+import type { BoardState, Dependency, Task, TaskStatus } from '@/lib/types';
 import * as api from '@/lib/api';
 
 interface EditTaskModalProps {
@@ -114,6 +114,18 @@ export default function EditTaskModal({ task, boardState, onSave, onClose }: Edi
               onChange={(e) => setForm({ ...form, isCritical: e.target.checked })}
             />
             <label className="text-sm text-gray-600 dark:text-gray-400">Critical</label>
+          </div>
+          <div>
+            <label className="text-sm text-gray-600 dark:text-gray-400">Status</label>
+            <select
+              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 mt-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              value={form.status}
+              onChange={(e) => setForm({ ...form, status: e.target.value as TaskStatus })}
+            >
+              <option value="todo">To Do</option>
+              <option value="in-progress">In Progress</option>
+              <option value="done">Done</option>
+            </select>
           </div>
           <div>
             <label className="text-sm text-gray-600 dark:text-gray-400">Description</label>

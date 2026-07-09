@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import type { BurndownData } from '@/lib/types';
+import { authHeaders } from '@/lib/api';
 
 interface BurndownChartProps {
   sprintId: string;
@@ -17,7 +18,7 @@ export default function BurndownChart({ sprintId, sprintName, onClose }: Burndow
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/sprints/${sprintId}/burndown`)
+    fetch(`/api/sprints/${sprintId}/burndown`, { headers: { ...authHeaders() } })
       .then(res => res.json())
       .then(d => { if (!cancelled) { setData(d); setError(null); } })
       .catch(err => { if (!cancelled) setError(err.message); })
@@ -146,8 +147,8 @@ export default function BurndownChart({ sprintId, sprintName, onClose }: Burndow
                 <ul className="mt-2 space-y-1">
                   {data.tasks.map(t => (
                     <li key={t.id} className="text-xs text-gray-600 dark:text-gray-300 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.isCritical ? '#22c55e' : '#d1d5db' }} />
-                      {t.title} — {t.estimate}pt {t.isCritical ? '✓' : ''}
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.status === 'done' ? '#22c55e' : '#d1d5db' }} />
+                      {t.title} — {t.estimate}pt {t.status === 'done' ? '✓' : t.status === 'in-progress' ? '◐' : ''}
                     </li>
                   ))}
                 </ul>

@@ -21,9 +21,7 @@ export function applyTaskFilter(
     for (const sprint of release.sprints) {
       for (const task of sprint.tasks) {
         if (hasSprint && task.sprintId !== filter.sprintId) continue;
-        // Status + hasJira filters work once task-detail-panel and jira-integration
-        // features are merged. On master, tasks don't have those fields yet —
-        // the sprint filter is the active one.
+        if (hasStatus && task.status !== filter.status) continue;
         matching.add(task.id);
       }
     }

@@ -74,14 +74,21 @@ export default function SortableTaskCard({
         {...listeners}
         className="flex items-center justify-between gap-2 cursor-grab active:cursor-grabbing"
       >
-        <span className="text-sm font-medium text-gray-800 dark:text-gray-100 flex-1">{task.title}</span>
+        <span className={`text-sm font-medium flex-1 ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-100'}`}>{task.title}</span>
         <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
           {task.estimate > 0 ? `${task.estimate}pt` : '—'}
         </span>
       </div>
-      {task.isCritical ? (
-        <span className="text-xs text-red-600 dark:text-red-400 font-semibold mt-1 inline-block">⚡ Critical</span>
-      ) : null}
+      <div className="flex items-center gap-1.5 mt-0.5">
+        {task.status === 'done' ? (
+          <span className="text-xs text-green-600 dark:text-green-400 font-semibold">✓ Done</span>
+        ) : task.status === 'in-progress' ? (
+          <span className="text-xs text-blue-500 dark:text-blue-400 font-medium">◐ In Progress</span>
+        ) : null}
+        {task.isCritical ? (
+          <span className="text-xs text-red-600 dark:text-red-400 font-semibold">⚡ Critical</span>
+        ) : null}
+      </div>
       {editingBy ? (
         <span className="text-xs text-blue-500 dark:text-blue-400 mt-1 inline-block animate-pulse" title={`${editingBy} is editing this task`}>
           ✏️ {editingBy} editing…

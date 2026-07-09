@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Task, TaskPriority, ProjectMember } from '@/lib/types';
+import type { Task, TaskPriority, TaskStatus, ProjectMember } from '@/lib/types';
 import * as api from '@/lib/api';
 
 interface TaskDetailPanelProps {
@@ -21,6 +21,12 @@ const PRIORITIES: { value: TaskPriority; label: string; color: string }[] = [
   { value: 'urgent', label: 'Urgent', color: '#ef4444' },
 ];
 
+const STATUSES: { value: TaskStatus; label: string; color: string }[] = [
+  { value: 'todo', label: 'To Do', color: '#6b7280' },
+  { value: 'in-progress', label: 'In Progress', color: '#3b82f6' },
+  { value: 'done', label: 'Done', color: '#22c55e' },
+];
+
 export default function TaskDetailPanel({
   task, projectId, members, canEdit, onClose, onUpdated, onEditingChange,
 }: TaskDetailPanelProps) {
@@ -29,6 +35,7 @@ export default function TaskDetailPanel({
   const [description, setDescription] = useState('');
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [priority, setPriority] = useState<TaskPriority>('medium');
+  const [status, setStatus] = useState<TaskStatus>('todo');
   const [saving, setSaving] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -39,6 +46,7 @@ export default function TaskDetailPanel({
       setDescription(task.description ?? '');
       setAssigneeId(task.assigneeId);
       setPriority(task.priority);
+      setStatus(task.status);
       setEditing(false);
     }
   }, [task?.id]);
@@ -77,6 +85,7 @@ export default function TaskDetailPanel({
         description: description || null,
         assigneeId,
         priority,
+        status,
         projectId,
       });
       onUpdated(updated);
@@ -86,7 +95,7 @@ export default function TaskDetailPanel({
     } finally {
       setSaving(false);
     }
-  }, [task, title, description, assigneeId, priority, projectId, onUpdated]);
+  }, [task, title, description, assigneeId, priority, status, projectId, onUpdated]);
 
   if (!task) return null;
 
@@ -187,6 +196,34 @@ export default function TaskDetailPanel({
               <div className="mt-1 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: priorityInfo?.color }} />
                 <span className="text-sm text-gray-700 dark:text-gray-200 capitalize">{task.priority}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Status */}
+          <div>
+            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Status</label>
+            {editing && canEdit ? (
+              <div className="flex gap-2 mt-1">
+                {STATUSES.map((s) => (
+                  <button
+                    key={s.value}
+                    onClick={() => setStatus(s.value)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      status === s.value
+                        ? 'bg-gray-100 dark:bg-gray-700 ring-1 ring-gray-300 dark:ring-gray-500'
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-1 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUSES.find(s => s.value === task.status)?.color }} />
+                <span className="text-sm text-gray-700 dark:text-gray-200 capitalize">{task.status.replace('-', ' ')}</span>
               </div>
             )}
           </div>

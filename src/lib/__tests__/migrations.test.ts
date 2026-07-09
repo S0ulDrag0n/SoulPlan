@@ -93,7 +93,7 @@ describe('Schema migrations', () => {
       }
       stmt.free();
 
-      expect(versions).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      expect(versions).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 
       // Re-run getDb() on the same file — migrations should be a no-op.
       // We simulate this by re-importing with the same data dir.
@@ -114,6 +114,17 @@ describe('Schema migrations', () => {
       expect(cols).toContain('assignee_id');
       expect(cols).toContain('priority');
       expect(cols).toContain('updated_at');
+    } finally {
+      setup.cleanup();
+    }
+  });
+
+  it('creates tasks.status and completed_at columns (V11)', async () => {
+    const setup = await setupTestDb();
+    try {
+      const cols = getColumns(setup.raw, 'tasks');
+      expect(cols).toContain('status');
+      expect(cols).toContain('completed_at');
     } finally {
       setup.cleanup();
     }

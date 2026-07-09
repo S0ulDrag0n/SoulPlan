@@ -10,7 +10,7 @@ interface BurndownData {
   sprint: { id: string; name: string; startDate: string | null; endDate: string | null };
   idealLine: { day: number; date: string; remaining: number }[];
   actualLine: { day: number; date: string; remaining: number }[];
-  tasks: { id: string; title: string; estimate: number; isCritical: boolean; createdAt: string }[];
+  tasks: { id: string; title: string; estimate: number; status: string; isCritical: boolean; createdAt: string; completedAt: string | null }[];
 }
 
 export async function GET(
@@ -28,19 +28,25 @@ export async function GET(
     if (!sprintRow) return NextResponse.json({ error: 'Sprint not found' }, { status: 404 });
     const sprint = toSprint(sprintRow);
 
-    // Verify project membership via release → board → project chain
-    const releases = await db.getReleasesByBoardId('');
-    // Find the release that contains this sprint
-    const releaseRows = await db.getSprintsByReleaseIds([sprintRow.release_id]);
-    if (!releaseRows.find(s => s.id === id)) {
-      return NextResponse.json({ error: 'Sprint not found in release' }, { status: 404 });
+    // Verify project membership via release → board → project chain.
+    const releaseRow = await db.getRelease(sprintRow.release_id);
+    if (!releaseRow) return NextResponse.json({ error: 'Sprint not found' }, { status: 404 });
+    const boardRow = await db.getBoard(releaseRow.board_id);
+    if (!boardRow || !boardRow.project_id) {
+      return NextResponse.json({ error: 'Sprint not found' }, { status: 404 });
+    }
+    const role = await getMemberRole(boardRow.project_id, session.memberId);
+    if (role === null) {
+      return NextResponse.json({ error: 'Not a member of this project' }, { status: 403 });
     }
 
     const taskRows = await db.getTasksBySprintIds([id]);
     const tasks = taskRows.map(toTask);
 
     const totalPoints = tasks.reduce((sum, t) => sum + (t.estimate || 0), 0);
-    const completedPoints = tasks.filter(t => t.isCritical).reduce((sum, t) => sum + (t.estimate || 0), 0);
+    const completedPoints = tasks
+      .filter(t => t.status === 'done')
+      .reduce((sum, t) => sum + (t.estimate || 0), 0);
     const remainingPoints = totalPoints - completedPoints;
 
     let idealLine: { day: number; date: string; remaining: number }[] = [];
@@ -62,8 +68,7 @@ export async function GET(
         const date = new Date(start.getTime() + d * 24 * 60 * 60 * 1000);
         if (date > now) break;
         const completedByDay = tasks
-          .filter(t => new Date(t.createdAt) <= date)
-          .filter(t => t.isCritical)
+          .filter(t => t.completedAt && new Date(t.completedAt) <= date)
           .reduce((sum, t) => sum + (t.estimate || 0), 0);
         actualLine.push({
           day: d,
@@ -80,7 +85,10 @@ export async function GET(
       sprint: { id: sprint.id, name: sprint.name, startDate: sprint.startDate, endDate: sprint.endDate },
       idealLine,
       actualLine,
-      tasks: tasks.map(t => ({ id: t.id, title: t.title, estimate: t.estimate, isCritical: t.isCritical, createdAt: t.createdAt })),
+      tasks: tasks.map(t => ({
+        id: t.id, title: t.title, estimate: t.estimate, status: t.status,
+        isCritical: t.isCritical, createdAt: t.createdAt, completedAt: t.completedAt,
+      })),
     };
 
     return NextResponse.json(data);

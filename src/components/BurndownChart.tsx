@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { BurndownData } from '@/lib/types';
 import { authHeaders } from '@/lib/api';
+import { Icon } from './Icon';
 
 interface BurndownChartProps {
   sprintId: string;
@@ -61,14 +62,18 @@ export default function BurndownChart({ sprintId, sprintName, onClose }: Burndow
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center animate-fade-in" onClick={onClose}>
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">📊 Burndown — {sprintName}</h3>
+          <h3 className="inline-flex items-center gap-2 text-base font-semibold text-gray-800 dark:text-gray-100">
+            <Icon name="chart" className="w-5 h-5 text-blue-500" /> Burndown \u2014 {sprintName}
+          </h3>
           <div className="flex items-center gap-3">
             {pace ? <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ backgroundColor: pace.color + '20', color: pace.color }}>{pace.label}</span> : null}
-            <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 text-lg">✕</button>
+            <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400" title="Close">
+              <Icon name="close" className="w-5 h-5" />
+            </button>
           </div>
         </div>
         <div className="p-5">
-          {loading ? <div className="flex items-center justify-center h-64 text-gray-400 dark:text-gray-500">Loading chart…</div>
+          {loading ? <div className="flex items-center justify-center h-64 text-gray-400 dark:text-gray-500">Loading chart\u2026</div>
           : error ? <div className="flex items-center justify-center h-64 text-red-500">{error}</div>
           : data ? (
             <>
@@ -101,7 +106,7 @@ export default function BurndownChart({ sprintId, sprintName, onClose }: Burndow
               <details className="mt-3">
                 <summary className="text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200">{data.tasks.length} tasks</summary>
                 <ul className="mt-2 space-y-1">
-                  {data.tasks.map(t => (<li key={t.id} className="text-xs text-gray-600 dark:text-gray-300 flex items-center gap-2"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.status === 'done' ? '#22c55e' : '#d1d5db' }} />{t.title} — {t.estimate}pt {t.status === 'done' ? '✓' : t.status === 'in-progress' ? '◐' : ''}</li>))}
+                  {data.tasks.map(t => (<li key={t.id} className="text-xs text-gray-600 dark:text-gray-300 flex items-center gap-2"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.status === 'done' ? '#22c55e' : '#d1d5db' }} />{t.title} \u2014 {t.estimate}pt {t.status === 'done' ? '\u2713' : t.status === 'in-progress' ? '\u25c8' : ''}</li>))}
                 </ul>
               </details>
             </>

@@ -26,6 +26,7 @@ import ActivityLogPanel from '@/components/ActivityLogPanel';
 import TaskDetailPanel from '@/components/TaskDetailPanel';
 import SearchBar from '@/components/SearchBar';
 import FilterBar from '@/components/FilterBar';
+import { Icon } from '@/components/Icon';
 import { applyTaskFilter } from '@/lib/filter';
 import { useAuth } from '@/components/AuthProvider';
 import { useBoard } from '@/hooks/useBoard';
@@ -570,7 +571,7 @@ export default function Home() {
               className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1"
               title="Share this project"
             >
-              <span>🔗</span> Share
+              <Icon name="share" className="w-4 h-4" /> Share
             </button>
           ) : null}
           {session && selectedProjectId ? (
@@ -579,7 +580,7 @@ export default function Home() {
               className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1"
               title="Activity log"
             >
-              🔔
+              <Icon name="bell" className="w-4 h-4" />
             </button>
           ) : null}
           {session ? (
@@ -608,7 +609,7 @@ export default function Home() {
                   className="px-2 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
                   title="Jump to first release"
                 >
-                  ⏮ First
+                  <Icon name="skip-back" className="w-4 h-4" /> First
                 </button>
               ) : null}
               <select

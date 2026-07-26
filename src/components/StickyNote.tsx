@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { StickyNote as StickyNoteModel } from '@/lib/types';
+import { Icon } from './Icon';
 
 interface StickyNoteProps {
   note: StickyNoteModel;
@@ -80,7 +81,7 @@ export default function StickyNote({ note, onMove, onTextChange, onDelete, onCol
       style={{ left: note.x, top: note.y, width: NOTE_WIDTH, minHeight: NOTE_MIN_HEIGHT, zIndex: note.z + 100, transition: dragging ? 'none' : 'transform 0.15s ease, box-shadow 0.15s ease', boxShadow: dragging ? '0 10px 30px rgba(0,0,0,0.2)' : '0 2px 8px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.6)' }}>
       <div className="px-2 py-1 flex items-center justify-between cursor-grab active:cursor-grabbing rounded-t-lg" onPointerDown={handleHeaderPointerDown} onClick={handleHeaderClick} title="Drag to move · Shift+click to change color · Double-click body to edit">
         <span className="text-[10px] text-gray-600/70 font-medium">note</span>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this sticky note?')) onDelete(note.id); }} className="text-gray-500 hover:text-red-600 text-xs leading-none" title="Delete note" onPointerDown={(e) => e.stopPropagation()}>✕</button>
+        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this sticky note?')) onDelete(note.id); }} className="text-gray-500 hover:text-red-600 text-xs leading-none" title="Delete note" onPointerDown={(e) => e.stopPropagation()}><Icon name="close" className="w-3 h-3" /></button>
       </div>
       <div ref={textRef} contentEditable={editing} suppressContentEditableWarning onDoubleClick={handleDoubleClick} onBlur={handleTextBlur} onKeyDown={handleTextKeyDown} onInput={(e) => setText((e.target as HTMLDivElement).textContent ?? '')} className={`px-3 pb-3 pt-1 text-sm text-gray-800 whitespace-pre-wrap break-words outline-none ${editing ? 'cursor-text' : 'cursor-default'}`} style={{ minHeight: NOTE_MIN_HEIGHT - 30 }}>
         {editing ? null : (text || <span className="text-gray-500/60 italic">Double-click to edit</span>)}

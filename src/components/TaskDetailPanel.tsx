@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Task, TaskPriority, TaskStatus, ProjectMember } from '@/lib/types';
 import * as api from '@/lib/api';
+import { Icon } from './Icon';
 
 interface TaskDetailPanelProps {
   task: Task | null;
@@ -89,7 +90,9 @@ export default function TaskDetailPanel({ task, projectId, members, canEdit, onC
       <div ref={panelRef} className="flex flex-col h-full">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Task Details</h3>
-          <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors text-lg">✕</button>
+          <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors" title="Close">
+            <Icon name="close" className="w-5 h-5" />
+          </button>
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
           <div>
@@ -98,7 +101,7 @@ export default function TaskDetailPanel({ task, projectId, members, canEdit, onC
           </div>
           <div>
             <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Description</label>
-            {editing && canEdit ? <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} className="w-full mt-1 px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 outline-none focus:border-blue-500 resize-y" placeholder="Add a description…" /> : <p className="mt-1 text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{task.description || 'No description'}</p>}
+            {editing && canEdit ? <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} className="w-full mt-1 px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 outline-none focus:border-blue-500 resize-y" placeholder="Add a description\u2026" /> : <p className="mt-1 text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{task.description || 'No description'}</p>}
           </div>
           <div>
             <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Assignee</label>
@@ -141,15 +144,22 @@ export default function TaskDetailPanel({ task, projectId, members, canEdit, onC
             <div className="flex justify-between text-xs"><dt className="text-gray-400 dark:text-gray-500">Created</dt><dd className="text-gray-600 dark:text-gray-300">{new Date(task.createdAt).toLocaleDateString()}</dd></div>
             {task.updatedAt && <div className="flex justify-between text-xs"><dt className="text-gray-400 dark:text-gray-500">Updated</dt><dd className="text-gray-600 dark:text-gray-300">{new Date(task.updatedAt).toLocaleDateString()}</dd></div>}
             <div className="flex justify-between text-xs"><dt className="text-gray-400 dark:text-gray-500">Estimate</dt><dd className="text-gray-600 dark:text-gray-300">{task.estimate} pts</dd></div>
-            <div className="flex justify-between text-xs"><dt className="text-gray-400 dark:text-gray-500">Critical</dt><dd className="text-gray-600 dark:text-gray-300">{task.isCritical ? '⚡ Yes' : 'No'}</dd></div>
+            <div className="flex justify-between text-xs">
+              <dt className="text-gray-400 dark:text-gray-500">Critical</dt>
+              <dd className="text-gray-600 dark:text-gray-300 inline-flex items-center gap-1">
+                {task.isCritical ? <><Icon name="bolt" className="w-3 h-3 text-red-500" strokeWidth={2.5} /> Yes</> : 'No'}
+              </dd>
+            </div>
           </dl>
         </div>
         {canEdit ? (
           <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 shrink-0 flex justify-end gap-2">
             {editing ? (
-              <><button onClick={() => setEditing(false)} className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 transition-colors">Cancel</button><button onClick={handleSave} disabled={saving} className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button></>
+              <><button onClick={() => setEditing(false)} className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 transition-colors">Cancel</button><button onClick={handleSave} disabled={saving} className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors disabled:opacity-50">{saving ? 'Saving\u2026' : 'Save'}</button></>
             ) : (
-              <button onClick={() => setEditing(true)} className="px-4 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors font-medium">✏️ Edit</button>
+              <button onClick={() => setEditing(true)} className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors font-medium">
+                <Icon name="edit" className="w-4 h-4" /> Edit
+              </button>
             )}
           </div>
         ) : null}

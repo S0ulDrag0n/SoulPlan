@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as q from '@/lib/queries';
 import { broadcastBoardUpdate } from '@/lib/realtime/broadcast';
 import { authenticate, getMemberRole, AuthError } from '@/lib/auth';
-import type { UpdateTaskInput, TaskPriority } from '@/lib/types';
+import type { UpdateTaskInput, TaskPriority, TaskStatus } from '@/lib/types';
 
 const VALID_PRIORITIES: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
+const VALID_STATUSES: TaskStatus[] = ['todo', 'in-progress', 'done'];
 
 // GET /api/tasks/[id] — return single task with detail
 export async function GET(
@@ -43,6 +44,13 @@ export async function PATCH(
     if (body.priority !== undefined && !VALID_PRIORITIES.includes(body.priority)) {
       return NextResponse.json(
         { error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}` },
+        { status: 400 }
+      );
+    }
+    // Validate status if provided
+    if (body.status !== undefined && !VALID_STATUSES.includes(body.status)) {
+      return NextResponse.json(
+        { error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` },
         { status: 400 }
       );
     }

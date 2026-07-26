@@ -3,6 +3,7 @@
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import SortableTaskCard from './SortableTaskCard';
+import { Icon } from './Icon';
 import type { Dependency, Sprint, SprintWithTasks, Task, ProjectMember } from '@/lib/types';
 
 interface SprintColumnProps {
@@ -97,9 +98,10 @@ export default function SprintColumn({
           {onShowBurndown ? (
             <button
               onClick={() => onShowBurndown(sprint.id, sprint.name)}
-              className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+              className="text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+              title="Burndown chart"
             >
-              📊
+              <Icon name="chart" className="w-4 h-4" />
             </button>
           ) : null}
           <button
@@ -139,9 +141,9 @@ export default function SprintColumn({
       {/* Dashed add-task card at bottom */}
       <button
         onClick={() => onAddTask(sprint.id)}
-        className="mx-3 mb-3 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-400 dark:text-gray-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors text-sm font-medium"
+        className="mx-3 mb-3 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-400 dark:text-gray-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors text-sm font-medium inline-flex items-center gap-1 justify-center"
       >
-        + Task
+        <Icon name="plus" className="w-4 h-4" /> Task
       </button>
     </div>
   );

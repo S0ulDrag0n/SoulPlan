@@ -1,6 +1,7 @@
 'use client';
 
 import SprintColumn from './SprintColumn';
+import { Icon } from './Icon';
 import type { Dependency, Release, ReleaseWithSprints, ProjectMember } from '@/lib/types';
 
 interface ReleaseBlockProps {
@@ -39,7 +40,11 @@ export default function ReleaseBlock({
             <button onClick={() => onDeleteRelease(release.id)} className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors">Delete</button>
           </div>
         </div>
-        {targetDate && <div className="text-xs text-gray-400 dark:text-gray-500">Target: {targetDate}</div>}
+        {targetDate && (
+          <div className="inline-flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+            <Icon name="calendar" className="w-3 h-3" /> {targetDate}
+          </div>
+        )}
         {release.notes && <div className="text-xs text-gray-500 dark:text-gray-400 italic mt-0.5 line-clamp-2">{release.notes}</div>}
       </div>
       <div className="flex gap-4 overflow-x-auto pb-2">
@@ -51,7 +56,9 @@ export default function ReleaseBlock({
             dimmedTaskIds={dimmedTaskIds} editingByTask={editingByTask}
             onShowBurndown={onShowBurndown} members={members} />
         ))}
-        <button onClick={() => onAddSprint(release.id)} className="min-w-[220px] max-w-[280px] h-[120px] border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-400 dark:text-gray-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors flex items-center justify-center text-sm font-medium shrink-0">+ Sprint</button>
+        <button onClick={() => onAddSprint(release.id)} className="min-w-[220px] max-w-[280px] h-[120px] border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-400 dark:text-gray-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors inline-flex items-center justify-center gap-1.5 text-sm font-medium shrink-0">
+          <Icon name="plus" className="w-4 h-4" /> Sprint
+        </button>
       </div>
     </div>
   );

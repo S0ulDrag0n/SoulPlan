@@ -16,31 +16,29 @@ interface SortableTaskCardProps {
   onSelect?: (task: Task) => void;
   dimmed?: boolean;
   editingBy?: string | null;
+  assigneeName?: string | null;
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+function colorFromString(str: string): string {
+  const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
 }
 
 export default function SortableTaskCard({
-  task,
-  blockingDeps = [],
-  blockedByDeps = [],
-  onEdit,
-  onDelete,
-  onJumpToTask,
-  onSelect,
-  dimmed = false,
-  editingBy = null,
+  task, blockingDeps = [], blockedByDeps = [], onEdit, onDelete, onJumpToTask, onSelect,
+  dimmed = false, editingBy = null, assigneeName = null,
 }: SortableTaskCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: task.id, data: { type: 'task', task } });
-
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id, data: { type: 'task', task } });
   const { connectionMode, hoveredTaskId, startConnection } = useDependencyConnector();
   const connectorRef = useRef<HTMLButtonElement>(null);
-
   const isDropTarget = connectionMode && hoveredTaskId === task.id;
 
   const style: React.CSSProperties = {
@@ -51,103 +49,44 @@ export default function SortableTaskCard({
   };
 
   const handleConnectorPointerDown = useCallback((e: React.PointerEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (connectorRef.current) {
-      startConnection(task.id, connectorRef.current);
-    }
+    e.stopPropagation(); e.preventDefault();
+    if (connectorRef.current) startConnection(task.id, connectorRef.current);
   }, [task.id, startConnection]);
 
-  return (
-    <div
-      ref={setNodeRef}
-      data-task-id={task.id}
-      style={style}
-      onClick={() => onSelect?.(task)}
-      className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-sm dark:shadow-gray-900/30 p-3 mb-2 hover:shadow-md transition-shadow cursor-pointer${
-        isDropTarget ? ' ring-2 ring-green-400 dark:ring-green-500 ring-offset-1' : ''
-      }`}
-    >
-      {/* Drag handle area — only this top section triggers dnd-kit drag */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="flex items-center justify-between gap-2 cursor-grab active:cursor-grabbing"
-      >
-        <span className={`text-sm font-medium flex-1 ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-100'}`}>{task.title}</span>
-        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
-          {task.estimate > 0 ? `${task.estimate}pt` : '—'}
-        </span>
-      </div>
-      <div className="flex items-center gap-1.5 mt-0.5">
-        {task.status === 'done' ? (
-          <span className="text-xs text-green-600 dark:text-green-400 font-semibold">✓ Done</span>
-        ) : task.status === 'in-progress' ? (
-          <span className="text-xs text-blue-500 dark:text-blue-400 font-medium">◐ In Progress</span>
-        ) : null}
-        {task.isCritical ? (
-          <span className="text-xs text-red-600 dark:text-red-400 font-semibold">⚡ Critical</span>
-        ) : null}
-      </div>
-      {editingBy ? (
-        <span className="text-xs text-blue-500 dark:text-blue-400 mt-1 inline-block animate-pulse" title={`${editingBy} is editing this task`}>
-          ✏️ {editingBy} editing…
-        </span>
-      ) : null}
+  const assigneeColor = assigneeName ? colorFromString(assigneeName) : null;
 
-      {/* Dependency badges */}
+  return (
+    <div ref={setNodeRef} data-task-id={task.id} style={style} onClick={() => onSelect?.(task)}
+      className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-sm dark:shadow-gray-900/30 p-3 mb-2 hover:shadow-md hover-lift transition-all cursor-pointer${isDropTarget ? ' ring-2 ring-green-400 dark:ring-green-500 ring-offset-1' : ''}`}>
+      <div {...attributes} {...listeners} className="flex items-center justify-between gap-2 cursor-grab active:cursor-grabbing">
+        <span className={`text-sm font-medium flex-1 ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-100'}`}>{task.title}</span>
+        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">{task.estimate > 0 ? `${task.estimate}pt` : '\u2014'}</span>
+      </div>
+      <div className="flex items-center gap-1.5 mt-1">
+        {task.status === 'done' ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300">✓ Done</span> : null}
+        {task.status === 'in-progress' ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">◐ In Progress</span> : null}
+        {task.isCritical ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">⚡ Critical</span> : null}
+        {assigneeName && assigneeColor ? (
+          <span className="ml-auto w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0" style={{ backgroundColor: assigneeColor }} title={assigneeName}>{getInitials(assigneeName)}</span>
+        ) : null}
+      </div>
+      {editingBy ? <span className="text-xs text-blue-500 dark:text-blue-400 mt-1 inline-block animate-pulse" title={`${editingBy} is editing this task`}>✏️ {editingBy} editing…</span> : null}
       {(blockingDeps.length > 0 || blockedByDeps.length > 0) ? (
         <div className="flex flex-wrap gap-1 mt-1.5">
           {blockedByDeps.map((dep) => (
-            <button
-              key={dep.id}
-              onClick={(e) => { e.stopPropagation(); onJumpToTask?.(dep.fromTaskId); }}
-              className="text-[10px] leading-tight px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800/50 transition-colors"
-              title={`Blocked by task ${dep.fromTaskId}`}
-            >
-              ← blocked
-            </button>
+            <button key={dep.id} onClick={(e) => { e.stopPropagation(); onJumpToTask?.(dep.fromTaskId); }} className="text-[10px] leading-tight px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800/50 transition-colors" title={`Blocked by task ${dep.fromTaskId}`}>← blocked</button>
           ))}
           {blockingDeps.map((dep) => (
-            <button
-              key={dep.id}
-              onClick={(e) => { e.stopPropagation(); onJumpToTask?.(dep.toTaskId); }}
-              className="text-[10px] leading-tight px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors"
-              title={`Blocks task ${dep.toTaskId}`}
-            >
-              → blocks
-            </button>
+            <button key={dep.id} onClick={(e) => { e.stopPropagation(); onJumpToTask?.(dep.toTaskId); }} className="text-[10px] leading-tight px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors" title={`Blocks task ${dep.toTaskId}`}>→ blocks</button>
           ))}
         </div>
       ) : null}
-
-      {/* Bottom row: action buttons + connector handle */}
       <div className="flex items-center justify-between mt-2">
         <div className="flex gap-1">
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(task); }}
-            className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400"
-          >
-            Edit
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); if (confirm('Delete this task?')) onDelete(task.id); }}
-            className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400"
-          >
-            Delete
-          </button>
+          <button onClick={(e) => { e.stopPropagation(); onEdit(task); }} className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400">Edit</button>
+          <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this task?')) onDelete(task.id); }} className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400">Delete</button>
         </div>
-
-        {/* Dependency connector handle — drag from here to another task to create a dependency */}
-        <button
-          ref={connectorRef}
-          onPointerDown={handleConnectorPointerDown}
-          onClick={(e) => e.stopPropagation()}
-          className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors cursor-crosshair"
-          title="Drag to another task to create a dependency (this task blocks the target)"
-        >
-          🔗
-        </button>
+        <button ref={connectorRef} onPointerDown={handleConnectorPointerDown} onClick={(e) => e.stopPropagation()} className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all cursor-crosshair hover:scale-110" title="Drag to another task to create a dependency">🔗</button>
       </div>
     </div>
   );

@@ -3,7 +3,7 @@
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import SortableTaskCard from './SortableTaskCard';
-import type { Dependency, Sprint, SprintWithTasks, Task } from '@/lib/types';
+import type { Dependency, Sprint, SprintWithTasks, Task, ProjectMember } from '@/lib/types';
 
 interface SprintColumnProps {
   sprint: SprintWithTasks;
@@ -19,21 +19,36 @@ interface SprintColumnProps {
   dimmedTaskIds?: Set<string> | null;
   editingByTask?: Map<string, string> | null;
   onShowBurndown?: (sprintId: string, sprintName: string) => void;
+  members?: ProjectMember[];
 }
 
 export default function SprintColumn({
   sprint, tasks, dependencies, onAddTask, onEditTask, onDeleteTask,
-  onEditSprint, onDeleteSprint, onJumpToTask, onSelectTask, dimmedTaskIds, editingByTask, onShowBurndown,
+  onEditSprint, onDeleteSprint, onJumpToTask, onSelectTask, dimmedTaskIds, editingByTask, onShowBurndown, members,
 }: SprintColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: sprint.id,
     data: { type: 'sprint', sprint },
   });
 
-  const dateRange = [sprint.startDate, sprint.endDate].filter(Boolean).join(' → ');
+  const dateRange = [sprint.startDate, sprint.endDate].filter(Boolean).join(' \u2192 ');
   const usedCapacity = tasks.reduce((sum, t) => sum + (t.estimate || 0), 0);
+  const capacityRatio = sprint.capacity > 0 ? Math.min(1, usedCapacity / sprint.capacity) : 0;
+  const doneCount = tasks.filter(t => t.status === 'done').length;
+  const progressRatio = tasks.length > 0 ? doneCount / tasks.length : 0;
+
+  // Accent color based on sprint progress
+  const accentColor = progressRatio > 0.75 ? '#22c55e' : progressRatio > 0.25 ? '#3b82f6' : '#9ca3af';
 
   const taskIds = tasks.map(t => t.id);
+
+  // Build assignee name lookup
+  const memberMap = new Map<string, string>();
+  if (members) {
+    for (const m of members) {
+      memberMap.set(m.memberId, m.memberType === 'user' ? `User (${m.role})` : `Guest (${m.role})`);
+    }
+  }
 
   return (
     <div
@@ -44,6 +59,7 @@ export default function SprintColumn({
           ? 'border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/30'
           : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'
       }`}
+      style={{ borderLeft: `4px solid ${accentColor}` }}
     >
       {/* Sprint header */}
       <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-xl">
@@ -53,6 +69,18 @@ export default function SprintColumn({
             {usedCapacity}/{sprint.capacity} {sprint.capacityUnit}
           </span>
         </div>
+
+        {/* Capacity progress bar */}
+        <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full mt-1 overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-300"
+            style={{
+              width: `${capacityRatio * 100}%`,
+              backgroundColor: capacityRatio > 1 ? '#ef4444' : accentColor,
+            }}
+          />
+        </div>
+
         {dateRange && (
           <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{dateRange}</div>
         )}
@@ -60,13 +88,6 @@ export default function SprintColumn({
           <div className="text-xs text-gray-500 dark:text-gray-400 italic mt-0.5 line-clamp-2">{sprint.notes}</div>
         )}
         <div className="flex items-center gap-2 mt-1">
-          <button
-            onClick={() => onAddTask(sprint.id)}
-            className="text-xs text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
-          >
-            + Task
-          </button>
-          <span className="text-gray-300 dark:text-gray-600">·</span>
           <button
             onClick={() => onEditSprint(sprint)}
             className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
@@ -91,7 +112,7 @@ export default function SprintColumn({
       </div>
 
       {/* Sortable tasks */}
-      <div className="flex-1 px-3 py-2 min-h-[120px]">
+      <div className="flex-1 px-3 py-2 min-h-[80px]">
         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => {
             const blockingDeps = dependencies.filter(d => d.fromTaskId === task.id);
@@ -108,11 +129,20 @@ export default function SprintColumn({
                 onSelect={onSelectTask}
                 dimmed={dimmedTaskIds?.has(task.id) ?? false}
                 editingBy={editingByTask?.get(task.id) ?? null}
+                assigneeName={task.assigneeId ? memberMap.get(task.assigneeId) ?? null : null}
               />
             );
           })}
         </SortableContext>
       </div>
+
+      {/* Dashed add-task card at bottom */}
+      <button
+        onClick={() => onAddTask(sprint.id)}
+        className="mx-3 mb-3 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-400 dark:text-gray-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors text-sm font-medium"
+      >
+        + Task
+      </button>
     </div>
   );
 }

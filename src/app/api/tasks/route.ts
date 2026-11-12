@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as q from '@/lib/queries';
 import { broadcastBoardUpdate } from '@/lib/realtime/broadcast';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, AuthError } from '@/lib/auth';
 import type { CreateTaskInput, UpdateTaskInput } from '@/lib/types';
 
 // POST /api/tasks — create a task
@@ -20,6 +20,9 @@ export async function POST(req: NextRequest) {
     q.logActivity(projectId, session.memberId, 'created', 'task', task.id, task.title).catch(() => {});
     return NextResponse.json(task);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('POST /api/tasks error:', error);
     return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
   }
@@ -41,6 +44,9 @@ export async function PATCH(req: NextRequest) {
     q.logActivity(projectId, session.memberId, 'updated', 'task', input.id, input.title).catch(() => {});
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('PATCH /api/tasks error:', error);
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
   }
@@ -60,6 +66,9 @@ export async function DELETE(req: NextRequest) {
     q.logActivity(projectId, session.memberId, 'deleted', 'task', id).catch(() => {});
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('DELETE /api/tasks error:', error);
     return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
   }

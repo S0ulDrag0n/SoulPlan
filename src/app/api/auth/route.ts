@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as q from '@/lib/queries';
-import { authenticate } from '@/lib/auth';
+import { authenticate, AuthError } from '@/lib/auth';
 import type { RegisterInput, LoginInput, JoinAsGuestInput } from '@/lib/types';
 
 // POST /api/auth — register, login, or join as guest
@@ -63,6 +63,9 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.json({ authenticated: true, session });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('GET /api/auth error:', error);
     return NextResponse.json({ error: 'Failed to verify session' }, { status: 500 });
   }
@@ -80,6 +83,9 @@ export async function DELETE(req: NextRequest) {
     await q.deleteSession(token);
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('DELETE /api/auth error:', error);
     return NextResponse.json({ error: 'Failed to logout' }, { status: 500 });
   }

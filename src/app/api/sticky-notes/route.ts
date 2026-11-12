@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as q from '@/lib/queries';
 import { broadcastBoardUpdate } from '@/lib/realtime/broadcast';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, AuthError } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,6 +21,9 @@ export async function POST(req: NextRequest) {
     q.logActivity(projectId, session.memberId, 'created', 'note', note.id, text?.slice(0, 50)).catch(() => {});
     return NextResponse.json(note);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('POST /api/sticky-notes error:', error);
     return NextResponse.json({ error: 'Failed to create sticky note' }, { status: 500 });
   }

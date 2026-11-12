@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as q from '@/lib/queries';
-import { requireAuth, getMemberRole } from '@/lib/auth';
+import { requireAuth, getMemberRole, AuthError } from '@/lib/auth';
 
 // GET /api/projects/[id]/jira/sync-log — get sync logs
 export async function GET(
@@ -16,6 +16,9 @@ export async function GET(
     const logs = await q.getSyncLogs(id);
     return NextResponse.json(logs);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('GET jira/sync-log error:', error);
     return NextResponse.json({ error: 'Failed to get sync logs' }, { status: 500 });
   }

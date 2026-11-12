@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, getMemberRole } from '@/lib/auth';
+import { requireAuth, getMemberRole, AuthError } from '@/lib/auth';
 import { JiraClient } from '@/lib/jira/client';
 import { getDb } from '@/lib/db/sqlite';
 import { decryptToken } from '@/lib/jira/crypto';
@@ -34,6 +34,9 @@ export async function GET(
     const issues = await client.getEpicIssues(epicKey);
     return NextResponse.json(issues);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('GET jira/epic-issues error:', error);
     return NextResponse.json({ error: 'Failed to get epic issues' }, { status: 500 });
   }

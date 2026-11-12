@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as q from '@/lib/queries';
-import { requireAuth, getMemberRole } from '@/lib/auth';
+import { requireAuth, getMemberRole, AuthError } from '@/lib/auth';
 
 // GET /api/projects/[id]/jira/config — get Jira config for project
 export async function GET(
@@ -16,6 +16,9 @@ export async function GET(
     const config = await q.getJiraConfig(id);
     return NextResponse.json(config || { configured: false });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('GET jira/config error:', error);
     return NextResponse.json({ error: 'Failed to get Jira config' }, { status: 500 });
   }
@@ -41,6 +44,9 @@ export async function POST(
     );
     return NextResponse.json(config);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('POST jira/config error:', error);
     return NextResponse.json({ error: 'Failed to create Jira config' }, { status: 500 });
   }
@@ -63,6 +69,9 @@ export async function PATCH(
     await q.updateJiraConfigById(config.id, body);
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('PATCH jira/config error:', error);
     return NextResponse.json({ error: 'Failed to update Jira config' }, { status: 500 });
   }
@@ -83,6 +92,9 @@ export async function DELETE(
     if (config) await q.deleteJiraConfig(config.id);
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('DELETE jira/config error:', error);
     return NextResponse.json({ error: 'Failed to delete Jira config' }, { status: 500 });
   }

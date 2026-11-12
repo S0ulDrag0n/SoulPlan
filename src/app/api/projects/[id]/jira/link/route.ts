@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as q from '@/lib/queries';
-import { requireAuth, getMemberRole } from '@/lib/auth';
+import { requireAuth, getMemberRole, AuthError } from '@/lib/auth';
 
 // POST /api/projects/[id]/jira/link — link a release/sprint/task to a Jira entity
 export async function POST(
@@ -28,6 +28,9 @@ export async function POST(
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('POST jira/link error:', error);
     return NextResponse.json({ error: 'Failed to link' }, { status: 500 });
   }

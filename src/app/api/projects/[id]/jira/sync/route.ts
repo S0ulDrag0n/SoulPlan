@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, getMemberRole } from '@/lib/auth';
+import { requireAuth, getMemberRole, AuthError } from '@/lib/auth';
 import { getDb } from '@/lib/db/sqlite';
 import { runSync } from '@/lib/jira/sync';
 import { broadcastBoardUpdate } from '@/lib/realtime/broadcast';
@@ -20,6 +20,9 @@ export async function POST(
     broadcastBoardUpdate(id, 'jira-sync');
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('POST jira/sync error:', error);
     return NextResponse.json({ error: 'Sync failed: ' + (error as Error).message }, { status: 500 });
   }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, getMemberRole } from '@/lib/auth';
+import { requireAuth, getMemberRole, AuthError } from '@/lib/auth';
 import { JiraClient } from '@/lib/jira/client';
 
 // POST /api/projects/[id]/jira/test-connection — test Jira connection
@@ -24,6 +24,9 @@ export async function POST(
     const result = await client.testConnection();
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('POST jira/test-connection error:', error);
     return NextResponse.json({ ok: false, error: (error as Error).message }, { status: 500 });
   }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, getMemberRole } from '@/lib/auth';
+import { requireAuth, getMemberRole, AuthError } from '@/lib/auth';
 import { JiraClient } from '@/lib/jira/client';
 import { getDb } from '@/lib/db/sqlite';
 import { decryptToken } from '@/lib/jira/crypto';
@@ -31,6 +31,9 @@ export async function GET(
     const fields = await client.getFields();
     return NextResponse.json(fields);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error('GET jira/fields error:', error);
     return NextResponse.json({ error: 'Failed to get fields' }, { status: 500 });
   }

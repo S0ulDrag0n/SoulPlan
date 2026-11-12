@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Project } from '@/lib/types';
 import * as api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
+import { Icon } from './Icon';
 
 interface ProjectSwitcherProps {
   currentProjectId: string | null;
@@ -120,7 +121,7 @@ export default function ProjectSwitcher({ currentProjectId, onSelectProject }: P
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm font-medium text-gray-700 dark:text-gray-200"
       >
-        <span className="text-gray-500 dark:text-gray-400">📁</span>
+        <span className="text-gray-500 dark:text-gray-400"><Icon name="folder" className="w-4 h-4" /></span>
         <span>{currentProject ? currentProject.name : 'Select Project'}</span>
         <span className="text-gray-400">▼</span>
       </button>
@@ -158,7 +159,7 @@ export default function ProjectSwitcher({ currentProjectId, onSelectProject }: P
                       className="px-2 py-1 mr-1 text-gray-300 dark:text-gray-600 hover:text-amber-500 dark:hover:text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Archive project"
                     >
-                      📦
+                      <Icon name="package" className="w-4 h-4" />
                     </button>
                   )}
                 </div>
@@ -200,7 +201,7 @@ export default function ProjectSwitcher({ currentProjectId, onSelectProject }: P
                               className="px-2 py-1 text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400"
                               title="Delete project"
                             >
-                              🗑️
+                              <Icon name="trash" className="w-4 h-4" />
                             </button>
                           </div>
                         </div>

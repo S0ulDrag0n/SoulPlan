@@ -1,6 +1,7 @@
 'use client';
 
 import type { TaskFilter } from '@/lib/types';
+import { Icon } from './Icon';
 
 interface FilterBarProps {
   filter: TaskFilter | null;
@@ -63,7 +64,7 @@ export default function FilterBar({ filter, onChange, sprints }: FilterBarProps)
         }`}
         title="Show only tasks linked to Jira"
       >
-        🔗 Jira
+        <Icon name="link" className="w-3.5 h-3.5" /> Jira
       </button>
 
       {/* Clear */}
@@ -72,7 +73,7 @@ export default function FilterBar({ filter, onChange, sprints }: FilterBarProps)
           onClick={() => onChange(null)}
           className="px-2 py-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
         >
-          ✕ Clear
+          <Icon name="close" className="w-3 h-3" strokeWidth={3} /> Clear
         </button>
       ) : null}
     </div>

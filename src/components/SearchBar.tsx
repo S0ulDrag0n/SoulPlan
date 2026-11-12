@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { SearchResult } from '@/lib/types';
 import { searchTasks as apiSearchTasks } from '@/lib/api';
+import { Icon } from './Icon';
 
 interface SearchBarProps {
   projectId: string;
@@ -120,7 +121,7 @@ export default function SearchBar({ projectId, onJumpToTask }: SearchBarProps) {
     <div ref={containerRef} className="relative">
       <div className="relative">
         <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-sm pointer-events-none">
-          🔍
+          <Icon name="search" className="w-4 h-4" />
         </span>
         <input
           ref={inputRef}
@@ -171,7 +172,7 @@ export default function SearchBar({ projectId, onJumpToTask }: SearchBarProps) {
                     </span>
                     {result.isCritical ? (
                       <span className="text-[10px] text-red-600 dark:text-red-400 font-semibold shrink-0">
-                        ⚡
+                        <Icon name="bolt" className="w-3 h-3" strokeWidth={2.5} />
                       </span>
                     ) : null}
                   </button>

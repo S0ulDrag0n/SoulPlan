@@ -62,6 +62,7 @@ const MIGRATIONS: { version: number; fn: (db: SqlJsDatabase) => void }[] = [
   { version: 8, fn: migrateV8 },
   { version: 9, fn: migrateV9 },
   { version: 10, fn: migrateV10 },
+  { version: 11, fn: migrateV11 },
 ];
 
 function runMigrations(db: SqlJsDatabase): void {
@@ -349,6 +350,19 @@ function migrateV10(db: SqlJsDatabase): void {
   }
 }
 
+function migrateV11(db: SqlJsDatabase): void {
+  // Task status — 'todo' | 'in-progress' | 'done'. Backs the burndown chart's
+  // completion signal and the dormant status filter (filter.ts).
+  const cols = getAll(db, 'PRAGMA table_info(tasks)') as Row[];
+  const colNames = new Set(cols.map(c => c.name as string));
+  if (!colNames.has('status')) {
+    db.run("ALTER TABLE tasks ADD COLUMN status TEXT NOT NULL DEFAULT 'todo'");
+  }
+  if (!colNames.has('completed_at')) {
+    db.run('ALTER TABLE tasks ADD COLUMN completed_at TEXT');
+  }
+}
+
 function saveToDisk(db: SqlJsDatabase): void {
   const data = db.export();
   const buffer = Buffer.from(data);
@@ -616,6 +630,11 @@ class SqlJsDataAdapter implements IDatabase {
     return getAll(this.db, 'SELECT * FROM releases WHERE board_id = ? ORDER BY position', [boardId]) as unknown as ReleaseRow[];
   }
 
+  async getRelease(id: string): Promise<ReleaseRow | undefined> {
+    const row = getOne(this.db, 'SELECT * FROM releases WHERE id = ?', [id]);
+    return row as unknown as ReleaseRow | undefined;
+  }
+
   async createRelease(id: string, boardId: string, name: string, position: number): Promise<ReleaseRow> {
     this.db.run('INSERT INTO releases (id, board_id, name, position) VALUES (?, ?, ?, ?)', [id, boardId, name, position]);
     saveToDisk(this.db);
@@ -682,6 +701,11 @@ class SqlJsDataAdapter implements IDatabase {
       `SELECT * FROM sprints WHERE release_id IN (${placeholders}) ORDER BY position`,
       releaseIds,
     ) as unknown as SprintRow[];
+  }
+
+  async getSprint(id: string): Promise<SprintRow | undefined> {
+    const row = getOne(this.db, 'SELECT * FROM sprints WHERE id = ?', [id]);
+    return row as unknown as SprintRow | undefined;
   }
 
   async createSprint(id: string, releaseId: string, name: string, position: number): Promise<SprintRow> {
@@ -751,7 +775,7 @@ class SqlJsDataAdapter implements IDatabase {
   }
 
   async updateTask(id: string, fields: Record<string, unknown>): Promise<void> {
-    const allowedKeys = ['title', 'description', 'estimate', 'color', 'is_critical', 'sprint_id', 'position', 'assignee_id', 'priority'] as const;
+    const allowedKeys = ['title', 'description', 'estimate', 'color', 'is_critical', 'sprint_id', 'position', 'assignee_id', 'priority', 'status', 'completed_at'] as const;
     const sets: string[] = [];
     const values: SqlValue[] = [];
     for (const [key, value] of Object.entries(fields)) {

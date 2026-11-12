@@ -98,6 +98,8 @@ export interface TaskRow {
   assignee_id: string | null;
   priority: string;
   updated_at: string | null;
+  status: string; // 'todo' | 'in-progress' | 'done'
+  completed_at: string | null;
 }
 
 export interface DependencyRow {

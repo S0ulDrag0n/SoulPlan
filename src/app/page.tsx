@@ -21,10 +21,12 @@ import ShareDialog from '@/components/ShareDialog';
 import BoardTitle from '@/components/BoardTitle';
 import CursorOverlay from '@/components/CursorOverlay';
 import PresenceBar from '@/components/PresenceBar';
+import BurndownChart from '@/components/BurndownChart';
 import ActivityLogPanel from '@/components/ActivityLogPanel';
 import TaskDetailPanel from '@/components/TaskDetailPanel';
 import SearchBar from '@/components/SearchBar';
 import FilterBar from '@/components/FilterBar';
+import { Icon } from '@/components/Icon';
 import { applyTaskFilter } from '@/lib/filter';
 import { useAuth } from '@/components/AuthProvider';
 import { useBoard } from '@/hooks/useBoard';
@@ -76,6 +78,7 @@ export default function Home() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
   const [taskFilter, setTaskFilter] = useState<TaskFilter | null>(null);
+  const [burndownSprint, setBurndownSprint] = useState<{ id: string; name: string } | null>(null);
 
   // Ref to always-read-latest boardState in async DnD handlers
   const boardStateRef = useRef(boardState);
@@ -478,7 +481,19 @@ export default function Home() {
   }
 
   if (authLoading || (loading && !boardState)) {
-    return <div className="p-8 text-gray-500 dark:text-gray-400">Loading...</div>;
+    return (
+    <div className="h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
+      <div className="h-16 glass-header border-b border-gray-200 dark:border-gray-700 shrink-0" />
+      <div className="flex-1 p-8 space-y-4">
+        <div className="h-8 w-48 shimmer rounded-lg" />
+        <div className="flex gap-4">
+          <div className="h-64 w-72 shimmer rounded-xl" />
+          <div className="h-64 w-72 shimmer rounded-xl" />
+          <div className="h-64 w-72 shimmer rounded-xl" />
+        </div>
+      </div>
+    </div>
+  );
   }
 
   // No project selected → prompt user to pick or create one
@@ -534,7 +549,7 @@ export default function Home() {
         </div>
       ) : null}
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between shrink-0">
+      <header className="glass-header border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
           <ProjectSwitcher currentProjectId={selectedProjectId} onSelectProject={handleSelectProject} />
           <BoardTitle boardState={boardState} isOwner={isOwner} onRename={handleRenameBoard} />
@@ -556,7 +571,7 @@ export default function Home() {
               className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1"
               title="Share this project"
             >
-              <span>🔗</span> Share
+              <Icon name="share" className="w-4 h-4" /> Share
             </button>
           ) : null}
           {session && selectedProjectId ? (
@@ -565,7 +580,7 @@ export default function Home() {
               className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1"
               title="Activity log"
             >
-              🔔
+              <Icon name="bell" className="w-4 h-4" />
             </button>
           ) : null}
           {session ? (
@@ -594,7 +609,7 @@ export default function Home() {
                   className="px-2 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
                   title="Jump to first release"
                 >
-                  ⏮ First
+                  <Icon name="skip-back" className="w-4 h-4" /> First
                 </button>
               ) : null}
               <select
@@ -659,6 +674,8 @@ export default function Home() {
                       onSelectTask={setSelectedTask}
                       dimmedTaskIds={dimmedTaskIds}
                       editingByTask={editingByTask}
+                      onShowBurndown={(sprintId, sprintName) => setBurndownSprint({ id: sprintId, name: sprintName })}
+                      members={projectMembers}
                     />
                   ))}
                 </div>
@@ -755,6 +772,13 @@ export default function Home() {
               sendEditing('task', selectedTask.id);
             }
           }}
+        />
+      ) : null}
+      {burndownSprint ? (
+        <BurndownChart
+          sprintId={burndownSprint.id}
+          sprintName={burndownSprint.name}
+          onClose={() => setBurndownSprint(null)}
         />
       ) : null}
     </div>

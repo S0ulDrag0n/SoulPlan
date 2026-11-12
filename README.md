@@ -57,6 +57,16 @@ npm run clean
 
 Then rebuild or restart. This removes the `.next/` directory so the next build regenerates it from scratch.
 
+## Resetting the Database
+
+The SQLite DB lives at `data/soul-plan.db`. To start fresh (re-run all migrations from V1, lose all data), delete it:
+
+```bash
+npm run reset-db
+```
+
+The next `dev` / `start` will recreate it and apply every migration in order.
+
 ## Docker
 
 Pre-built images are published to GHCR on every push to `master` and on `v0.1*` tags. Images are `linux/amd64` only — Tailwind CSS and Lightning CSS have cross-platform optional deps that don't build on arm64.

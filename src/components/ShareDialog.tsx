@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { ProjectInvite, ProjectMember } from '@/lib/types';
 import * as api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
+import { Icon } from './Icon';
 
 interface ShareDialogProps {
   projectId: string;
@@ -104,7 +105,7 @@ export default function ShareDialog({ projectId, onClose, onAcceptedInvite }: Sh
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
           >
-            ✕
+            <Icon name="close" className="w-5 h-5" />
           </button>
         </div>
 
@@ -162,7 +163,7 @@ export default function ShareDialog({ projectId, onClose, onAcceptedInvite }: Sh
                             : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500'
                         }`}
                       >
-                        {isCopied ? '✓ Copied' : 'Copy'}
+                        {isCopied ? '<Icon name="check" className="w-3 h-3 inline" strokeWidth={3} /> Copied' : 'Copy'}
                       </button>
                       <button
                         onClick={() => handleRevokeInvite(invite.id)}
@@ -198,7 +199,7 @@ export default function ShareDialog({ projectId, onClose, onAcceptedInvite }: Sh
                           ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                           : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
                       }`}>
-                        {member.memberType === 'user' ? '👤' : '👋'}
+                        {member.memberType === 'user' ? '<Icon name="user" className="w-5 h-5" />' : '<Icon name="hand" className="w-5 h-5" />'}
                       </div>
                       <div>
                         <div className="text-sm text-gray-700 dark:text-gray-200">

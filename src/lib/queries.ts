@@ -144,6 +144,15 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
 export async function updateTask(input: UpdateTaskInput): Promise<void> {
   const db: IDatabase = await getDb();
   const fields = taskToRow(input);
+  // Auto-stamp completed_at when status flips to 'done', clear it otherwise.
+  // Only override when the caller didn't pass an explicit completed_at.
+  if (input.status !== undefined && input.completedAt === undefined) {
+    if (input.status === 'done') {
+      fields.completed_at = new Date().toISOString();
+    } else {
+      fields.completed_at = null;
+    }
+  }
   await db.updateTask(input.id, fields);
 }
 

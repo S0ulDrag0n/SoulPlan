@@ -30,3 +30,6 @@ jobs:
 
       - name: Run tests
         run: npx jest --verbose
+
+      - name: Production build
+        run: npm run build

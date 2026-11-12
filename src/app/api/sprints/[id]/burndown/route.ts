@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db/sqlite';
 import { authenticate, getMemberRole, AuthError } from '@/lib/auth';
 import { toSprint, toTask } from '@/lib/transform';
+import { computeBurndown } from '@/lib/burndown';
+import type { BurndownTask } from '@/lib/burndown';
 
 interface BurndownData {
   totalPoints: number;
@@ -49,42 +51,22 @@ export async function GET(
       .reduce((sum, t) => sum + (t.estimate || 0), 0);
     const remainingPoints = totalPoints - completedPoints;
 
-    let idealLine: { day: number; date: string; remaining: number }[] = [];
-    let actualLine: { day: number; date: string; remaining: number }[] = [];
+    const computed = computeBurndown(
+      tasks.map((t): BurndownTask => ({
+        id: t.id, title: t.title, estimate: t.estimate, status: t.status,
+        isCritical: t.isCritical, createdAt: t.createdAt, completedAt: t.completedAt,
+      })),
+      { id: sprint.id, name: sprint.name, startDate: sprint.startDate, endDate: sprint.endDate },
+      new Date().toISOString().split('T')[0],
+    );
 
-    if (sprint.startDate && sprint.endDate) {
-      const start = new Date(sprint.startDate);
-      const end = new Date(sprint.endDate);
-      const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-
-      for (let d = 0; d <= days; d++) {
-        const date = new Date(start.getTime() + d * 24 * 60 * 60 * 1000);
-        const remaining = Math.round(totalPoints * (1 - d / days));
-        idealLine.push({ day: d, date: date.toISOString().split('T')[0], remaining });
-      }
-
-      const now = new Date();
-      for (let d = 0; d <= days; d++) {
-        const date = new Date(start.getTime() + d * 24 * 60 * 60 * 1000);
-        if (date > now) break;
-        const completedByDay = tasks
-          .filter(t => t.completedAt && new Date(t.completedAt) <= date)
-          .reduce((sum, t) => sum + (t.estimate || 0), 0);
-        actualLine.push({
-          day: d,
-          date: date.toISOString().split('T')[0],
-          remaining: totalPoints - completedByDay,
-        });
-      }
-    }
-
-    const data: BurndownData = {
-      totalPoints,
-      completedPoints,
-      remainingPoints,
-      sprint: { id: sprint.id, name: sprint.name, startDate: sprint.startDate, endDate: sprint.endDate },
-      idealLine,
-      actualLine,
+const data: BurndownData = {
+      totalPoints: computed.totalPoints,
+      completedPoints: computed.completedPoints,
+      remainingPoints: computed.remainingPoints,
+      sprint: computed.sprint,
+      idealLine: computed.idealLine,
+      actualLine: computed.actualLine,
       tasks: tasks.map(t => ({
         id: t.id, title: t.title, estimate: t.estimate, status: t.status,
         isCritical: t.isCritical, createdAt: t.createdAt, completedAt: t.completedAt,

@@ -123,3 +123,21 @@
 - PresenceBar: avatar stack in header showing who's online with count
 - Event types: cursor, presence (join/leave), editing, board-update
 - All realtime endpoints require authentication
+
+## 2026-11-12 — feature branches landed
+
+- `feature/ui-revision` merged (c8ffd1c): burndown chart + unified SVG icon
+  system + status validation + glassmorphism polish. Clean 3-way.
+- `feature/jira-integration` merged (5a2ab3f): per-project Jira config,
+  two-way sync, sync log, task matcher. Union-resolved onto the UI revision
+  (jira badges live on the new card components; Jira header buttons use the
+  icon system — `sync` and `settings` icons added to Icon.tsx).
+- transform.test expectation updated for the new nullable jira fields
+  (0361d9a); every API route now returns the AuthError status (401/403)
+  instead of a generic 500 (3120d53) — AuthError is caught by convention in
+  all catches.
+- Verified locally: jest 141/141, next build clean, dev-server e2e 13/13
+  (auth register/login/verify, project, release, sprint, tasks, dependency +
+  duplicate-409, burndown route, SSE presence/cursor). The maintenance board
+  created by that run ("App Maintenance — 2026-11-12") holds the current
+  backlog: 9 cleanup/enhancement tasks.

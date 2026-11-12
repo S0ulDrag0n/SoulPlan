@@ -225,6 +225,7 @@ describe('toTask', () => {
       id: 't1', sprintId: 's1', title: 'Setup CI', description: null, estimate: 3,
       color: '#3b82f6', isCritical: false, position: 0, createdAt: '2025-01-01T00:00:00Z',
       assigneeId: null, priority: 'medium', updatedAt: null, status: 'todo', completedAt: null,
+      jiraIssueKey: null, jiraIssueId: null, jiraStatus: null,
     });
   });
 

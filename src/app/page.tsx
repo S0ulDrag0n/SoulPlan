@@ -18,6 +18,9 @@ import ThemeToggle from '@/components/ThemeToggle';
 import AuthForm from '@/components/AuthForm';
 import ProjectSwitcher from '@/components/ProjectSwitcher';
 import ShareDialog from '@/components/ShareDialog';
+import { JiraConfigDialog } from '@/components/JiraConfigDialog';
+import { JiraSyncPanel } from '@/components/JiraSyncPanel';
+import { JiraTaskMatcher } from '@/components/JiraTaskMatcher';
 import BoardTitle from '@/components/BoardTitle';
 import CursorOverlay from '@/components/CursorOverlay';
 import PresenceBar from '@/components/PresenceBar';
@@ -72,6 +75,10 @@ export default function Home() {
   const [editingRelease, setEditingRelease] = useState<Release | null>(null);
   const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showJiraConfig, setShowJiraConfig] = useState(false);
+  const [showJiraSync, setShowJiraSync] = useState(false);
+  const [jiraMatcherTask, setJiraMatcherTask] = useState<Task | null>(null);
+  const [jiraConfigured, setJiraConfigured] = useState(false);
   const [userRole, setUserRole] = useState<MemberRole | null>(null);
   const [jumpPan, setJumpPan] = useState<{ x: number; y: number } | null>(null);
   const [showActivityLog, setShowActivityLog] = useState(false);
@@ -146,6 +153,16 @@ export default function Home() {
       setSelectedProjectId(null);
     }
   }, [error, selectedProjectId]);
+  // Check if Jira is configured for the selected project.
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setJiraConfigured(false);
+      return;
+    }
+    api.fetchJiraConfig(selectedProjectId)
+      .then(c => { setJiraConfigured(!('configured' in c && c.configured === false)); })
+      .catch(() => setJiraConfigured(false));
+  }, [selectedProjectId]);
 
   const handleRenameBoard = useCallback(async (name: string) => {
     if (!boardState || !selectedProjectId) return;
@@ -575,13 +592,32 @@ export default function Home() {
             </button>
           ) : null}
           {session && selectedProjectId ? (
-            <button
-              onClick={() => setShowActivityLog(true)}
-              className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1"
-              title="Activity log"
-            >
-              <Icon name="bell" className="w-4 h-4" />
-            </button>
+            <>
+              <button
+                onClick={() => setShowActivityLog(true)}
+                className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1"
+                title="Activity log"
+              >
+                <Icon name="bell" className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setShowJiraSync(true)}
+                className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-1"
+                title="Jira Sync"
+                disabled={!jiraConfigured}
+              >
+                <Icon name="sync" className="w-4 h-4" /> Sync
+              </button>
+              {isOwner ? (
+                <button
+                  onClick={() => setShowJiraConfig(true)}
+                  className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-1"
+                  title="Configure Jira integration"
+                >
+                  <Icon name="settings" className="w-4 h-4" />
+                </button>
+              ) : null}
+            </>
           ) : null}
           {session ? (
             <span className="text-sm text-gray-500 dark:text-gray-400">{session.displayName}</span>
@@ -676,6 +712,7 @@ export default function Home() {
                       editingByTask={editingByTask}
                       onShowBurndown={(sprintId, sprintName) => setBurndownSprint({ id: sprintId, name: sprintName })}
                       members={projectMembers}
+                      onMatchTasks={jiraConfigured ? (task) => setJiraMatcherTask(task) : undefined}
                     />
                   ))}
                 </div>
@@ -779,6 +816,40 @@ export default function Home() {
           sprintId={burndownSprint.id}
           sprintName={burndownSprint.name}
           onClose={() => setBurndownSprint(null)}
+        />
+      ) : null}
+
+      {/* Jira config dialog (owner only) */}
+      {showJiraConfig && selectedProjectId ? (
+        <JiraConfigDialog
+          projectId={selectedProjectId}
+          isOpen={showJiraConfig}
+          onClose={() => setShowJiraConfig(false)}
+          onSaved={() => {
+            setJiraConfigured(true);
+            reload();
+          }}
+        />
+      ) : null}
+
+      {/* Jira sync panel */}
+      {showJiraSync && selectedProjectId ? (
+        <JiraSyncPanel
+          projectId={selectedProjectId}
+          isOpen={showJiraSync}
+          onClose={() => setShowJiraSync(false)}
+        />
+      ) : null}
+
+      {/* Jira task matcher */}
+      {jiraMatcherTask && selectedProjectId ? (
+        <JiraTaskMatcher
+          projectId={selectedProjectId}
+          taskId={jiraMatcherTask.id}
+          taskTitle={jiraMatcherTask.title}
+          isOpen={!!jiraMatcherTask}
+          onClose={() => setJiraMatcherTask(null)}
+          onLinked={() => reload()}
         />
       ) : null}
     </div>

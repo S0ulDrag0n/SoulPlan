@@ -15,6 +15,7 @@ describe('Schema migrations', () => {
         'releases', 'sprints', 'tasks', 'dependencies',
         'sticky_notes', 'note_connections',
         'activity_log',
+        'jira_config', 'jira_sync_log',
         'schema_migrations',
       ];
 
@@ -66,6 +67,31 @@ describe('Schema migrations', () => {
     const setup = await setupTestDb();
     try {
       expect(getColumns(setup.raw, 'tasks')).toContain('is_critical');
+    } finally {
+      setup.cleanup();
+    }
+  });
+
+  it('creates jira_config and jira_sync_log tables (V9)', async () => {
+    const setup = await setupTestDb();
+    try {
+      const tables = getTables(setup.raw);
+      expect(tables).toContain('jira_config');
+      expect(tables).toContain('jira_sync_log');
+    } finally {
+      setup.cleanup();
+    }
+  });
+
+  it('creates Jira link columns on releases, sprints, tasks (V9)', async () => {
+    const setup = await setupTestDb();
+    try {
+      expect(getColumns(setup.raw, 'releases')).toContain('jira_release_id');
+      expect(getColumns(setup.raw, 'sprints')).toContain('jira_sprint_id');
+      const taskCols = getColumns(setup.raw, 'tasks');
+      expect(taskCols).toContain('jira_issue_key');
+      expect(taskCols).toContain('jira_issue_id');
+      expect(taskCols).toContain('jira_status');
     } finally {
       setup.cleanup();
     }

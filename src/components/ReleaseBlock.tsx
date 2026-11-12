@@ -2,7 +2,7 @@
 
 import SprintColumn from './SprintColumn';
 import { Icon } from './Icon';
-import type { Dependency, Release, ReleaseWithSprints, ProjectMember } from '@/lib/types';
+import type { Dependency, Release, ReleaseWithSprints, ProjectMember, Task } from '@/lib/types';
 
 interface ReleaseBlockProps {
   release: ReleaseWithSprints;
@@ -10,7 +10,7 @@ interface ReleaseBlockProps {
   onEditRelease: (release: Release) => void;
   onDeleteRelease: (id: string) => void;
   onAddTask: (sprintId: string) => void;
-  onEditTask: (task: import('@/lib/types').Task) => void;
+  onEditTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onEditSprint: (sprint: import('@/lib/types').Sprint) => void;
   onDeleteSprint: (id: string) => void;
@@ -21,12 +21,13 @@ interface ReleaseBlockProps {
   editingByTask?: Map<string, string> | null;
   onShowBurndown?: (sprintId: string, sprintName: string) => void;
   members?: ProjectMember[];
+  onMatchTasks?: (task: Task) => void;
 }
 
 export default function ReleaseBlock({
   release, onAddSprint, onEditRelease, onDeleteRelease,
   onAddTask, onEditTask, onDeleteTask, onEditSprint, onDeleteSprint,
-  dependencies, onJumpToTask, onSelectTask, dimmedTaskIds, editingByTask, onShowBurndown, members,
+  dependencies, onJumpToTask, onSelectTask, dimmedTaskIds, editingByTask, onShowBurndown, members, onMatchTasks,
 }: ReleaseBlockProps) {
   const targetDate = release.targetDate ? new Date(release.targetDate).toLocaleDateString() : null;
 
@@ -54,7 +55,7 @@ export default function ReleaseBlock({
             onEditSprint={onEditSprint} onDeleteSprint={onDeleteSprint}
             onJumpToTask={onJumpToTask} onSelectTask={onSelectTask}
             dimmedTaskIds={dimmedTaskIds} editingByTask={editingByTask}
-            onShowBurndown={onShowBurndown} members={members} />
+            onShowBurndown={onShowBurndown} members={members} onMatchTasks={onMatchTasks} />
         ))}
         <button onClick={() => onAddSprint(release.id)} className="min-w-[220px] max-w-[280px] h-[120px] border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-400 dark:text-gray-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors inline-flex items-center justify-center gap-1.5 text-sm font-medium shrink-0">
           <Icon name="plus" className="w-4 h-4" /> Sprint

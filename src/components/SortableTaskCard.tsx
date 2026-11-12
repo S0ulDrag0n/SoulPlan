@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { Dependency, Task } from '@/lib/types';
 import { useDependencyConnector } from './DependencyConnector';
 import { Icon } from './Icon';
+import { JiraBadge } from './JiraBadge';
 
 interface SortableTaskCardProps {
   task: Task;
@@ -18,6 +19,7 @@ interface SortableTaskCardProps {
   dimmed?: boolean;
   editingBy?: string | null;
   assigneeName?: string | null;
+  onMatch?: (task: Task) => void;
 }
 
 function getInitials(name: string): string {
@@ -35,7 +37,7 @@ function colorFromString(str: string): string {
 
 export default function SortableTaskCard({
   task, blockingDeps = [], blockedByDeps = [], onEdit, onDelete, onJumpToTask, onSelect,
-  dimmed = false, editingBy = null, assigneeName = null,
+  dimmed = false, editingBy = null, assigneeName = null, onMatch,
 }: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id, data: { type: 'task', task } });
   const { connectionMode, hoveredTaskId, startConnection } = useDependencyConnector();
@@ -99,9 +101,31 @@ export default function SortableTaskCard({
         </div>
       ) : null}
       <div className="flex items-center justify-between mt-2">
-        <div className="flex gap-1">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(task); }} className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400">Edit</button>
-          <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this task?')) onDelete(task.id); }} className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400">Delete</button>
+        <div className="flex gap-1 items-center">
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(task); }}
+            className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400"
+          >
+            Edit
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); if (confirm('Delete this task?')) onDelete(task.id); }}
+            className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400"
+          >
+            Delete
+          </button>
+          {onMatch && !task.jiraIssueKey ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onMatch(task); }}
+              className="text-xs text-indigo-400 dark:text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400"
+              title="Link to Jira issue"
+            >
+              Jira
+            </button>
+          ) : null}
+          {task.jiraIssueKey ? (
+            <JiraBadge issueKey={task.jiraIssueKey} status={task.jiraStatus} />
+          ) : null}
         </div>
         <button ref={connectorRef} onPointerDown={handleConnectorPointerDown} onClick={(e) => e.stopPropagation()} className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all cursor-crosshair hover:scale-110" title="Drag to another task to create a dependency">
           <Icon name="link" className="w-4 h-4" />
